@@ -125,6 +125,21 @@ class AuthControllerTest {
 	}
 
 	@Test
+	@DisplayName("C-실패: 이메일이 공백이면 400과 email 필드 오류를 반환한다")
+	void 로그인_이메일_공백() throws Exception {
+		mockMvc.perform(post("/api/login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(new LoginRequest(" ", SEED_PASSWORD))))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.errors[*].field", org.hamcrest.Matchers.hasItem("email")))
+				.andExpect(jsonPath("$.errors[*].message",
+						org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.not(
+								org.hamcrest.Matchers.emptyOrNullString()))))
+				.andExpect(jsonPath("$.timestamp").value(org.hamcrest.Matchers.matchesPattern(ISO_8601_UTC_REGEX)));
+	}
+
+	@Test
 	@DisplayName("C-실패: 비밀번호가 공백이면 400과 password 필드 오류를 반환한다")
 	void 로그인_비밀번호_공백() throws Exception {
 		mockMvc.perform(post("/api/login")
@@ -202,8 +217,11 @@ class AuthControllerTest {
 	void 로그아웃_성공_이후_me_401() throws Exception {
 		MockHttpSession session = loginAndGetSession();
 
-		mockMvc.perform(post("/api/logout").session(session))
-				.andExpect(status().isNoContent());
+		MvcResult logoutResult = mockMvc.perform(post("/api/logout").session(session))
+				.andExpect(status().isNoContent())
+				.andReturn();
+
+		assertThat(logoutResult.getResponse().getContentAsByteArray()).hasSize(0);
 
 		assertThat(session.isInvalid()).isTrue();
 
@@ -214,8 +232,11 @@ class AuthControllerTest {
 	@Test
 	@DisplayName("E-실패쪽: 세션이 없는 상태로 로그아웃해도 204를 반환한다")
 	void 로그아웃_세션없어도_204() throws Exception {
-		mockMvc.perform(post("/api/logout"))
-				.andExpect(status().isNoContent());
+		MvcResult logoutResult = mockMvc.perform(post("/api/logout"))
+				.andExpect(status().isNoContent())
+				.andReturn();
+
+		assertThat(logoutResult.getResponse().getContentAsByteArray()).hasSize(0);
 	}
 
 	// ---------- F. 공통 에러 형태 ----------
@@ -227,9 +248,11 @@ class AuthControllerTest {
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(objectMapper.writeValueAsString(new LoginRequest("bad-email", ""))))
 				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$").value(org.hamcrest.Matchers.aMapWithSize(4)))
 				.andExpect(jsonPath("$.timestamp").exists())
 				.andExpect(jsonPath("$.status").value(400))
 				.andExpect(jsonPath("$.message").exists())
+				.andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.isEmptyOrNullString())))
 				.andExpect(jsonPath("$.errors").isArray());
 	}
 
@@ -238,9 +261,11 @@ class AuthControllerTest {
 	void 에러형태_401() throws Exception {
 		mockMvc.perform(get("/api/me"))
 				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$").value(org.hamcrest.Matchers.aMapWithSize(4)))
 				.andExpect(jsonPath("$.timestamp").exists())
 				.andExpect(jsonPath("$.status").value(401))
 				.andExpect(jsonPath("$.message").exists())
+				.andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.isEmptyOrNullString())))
 				.andExpect(jsonPath("$.errors").isArray());
 	}
 
