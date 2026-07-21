@@ -7,6 +7,9 @@ _Open items use "- [ ]". Empty Open list + green verify is the signal to create 
 
 ## Verify
 
+- 2026-07-21 사이클 13 검증: `cd fe && npm run build`가 종료 코드 0으로 Next.js 컴파일과 TypeScript 검사를 통과했다.
+- 2026-07-21 사이클 13 검증: `cd fe && npm run verify:stub`가 계약 스텁 로그인·인증 확인·로그아웃 흐름을 통과했다.
+- cycle green: 사이클 13의 빌드와 스텁 검증이 모두 통과했다.
 - 2026-07-21 사이클 13 구현 점검: TRD와 열린 개선 항목을 다시 확인했지만 이번 턴에 추가로 구현할 잔여 항목은 없었다. 현재 구현은 유지하고 다음 검증 기준점으로 남긴다.
 - DESIGN.md 2절에서 agent-browser로 관찰한 toss.im의 색·타이포·버튼·여백 재현 근거를 확인했다.
 - agent-browser로 `/login`에서 이메일·비밀번호 입력, 로그인 버튼, 미니멀 카드와 파란 프라이머리 버튼 렌더링을 확인했다.
