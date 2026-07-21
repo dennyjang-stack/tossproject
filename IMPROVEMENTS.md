@@ -48,3 +48,19 @@ _Open items use "- [ ]". Empty Open list + green verify is the signal to create 
 - 교차검증의 9개 인수 조건이 모두 pass이고 fail·doubt가 없어 기능 범위와 조건 수는 유지했다.
 - 다음 세대가 MockMvc로 독립 재현할 수 있도록 시드 요청·정확한 응답 필드, HttpOnly 쿠키 명시 설정, 오류별 `errors[]`, UTC 정규식, Git 비교 범위와 빌드 기대 결과를 조건에 구체화했다.
 - 기존 인수 조건 9개의 체크박스를 모두 `- [ ]`로 초기화해 다음 세대가 처음부터 다시 검증하도록 했다.
+
+## 교차검증 정합성
+
+_사이클 1 · crossverify-consistency 페이즈 — 이전 세대(반대 프로바이더) 산출물을 코드·테스트·빌드 결과로 독립 재검토한 결과. 코드는 변경하지 않았다. 새로 실행한 `be/`의 `./gradlew clean build` → `BUILD SUCCESSFUL`, 종료 코드 0, `AuthControllerTest` `tests="14" skipped="0" failures="0" errors="0"`._
+
+- [x] pass: 인수 조건 1 (`POST /api/login` 시드 계정 → 200 정확히 `{"name":"토스사용자"}` + 세션 생성 + `http-only=true` 명시) — `AuthController.login`이 `new LoginResponse(user.name())`를 반환하고, `application.yml`에 `server.servlet.session.cookie.http-only: true`가 명시돼 있다. `로그인_성공` 테스트가 200·`$.name`·세션 속성을, `세션쿠키_HttpOnly_명시설정` 테스트가 프로퍼티 `"true"`를 검증하며 둘 다 통과한다.
+- [x] pass: 인수 조건 2 (미등록 이메일·틀린 비밀번호 → 401, `status`=401, `errors` 빈 배열) — `AuthService.authenticate`가 `InvalidCredentialsException`을 던지고 `ApiExceptionHandler`가 `List.of()`(빈 배열)로 401을 만든다. `로그인_비밀번호_불일치`(status 401·`errors` empty 확인)와 `로그인_존재하지않는_이메일`(401)이 통과한다.
+- [x] pass: 인수 조건 3 (이메일 형식 오류·공백 → 400, `errors[]`에 필드별 `{field, message}`) — `LoginRequest`의 `@NotBlank @Email` 선언형 검증이 `MethodArgumentNotValidException`을 유발하고 핸들러가 필드 오류를 `FieldErrorItem`으로 매핑한다. `로그인_이메일_형식_오류`(`field`=email), `로그인_비밀번호_공백`(`field`=password), `에러형태_400`이 통과한다.
+- [x] pass: 인수 조건 4 (`GET /api/me` 세션有 → 200 정확히 `{email,name}` / 세션無·속성無 → 401) — `AuthService.currentUser`가 세션 null 또는 속성이 `MeResponse`가 아니면 `UnauthorizedException`을 던지고, 아니면 저장된 `MeResponse`를 반환한다. `me_세션있음`(200·email·name), `me_세션없음`(401)이 통과한다.
+- [x] pass: 인수 조건 5 (`POST /api/logout` → 본문 없는 204 + 기존 세션 무효화, 직후 `me` 401) — `AuthController.logout`이 세션이 있으면 `invalidate()` 후 204를 반환한다. `로그아웃_성공_이후_me_401`이 `MockHttpSession.isInvalid()`와 후속 401을, `로그아웃_세션없어도_204`가 세션 없을 때 204를 검증하며 통과한다.
+- [x] pass: 인수 조건 6 (400·401 에러 응답에 `timestamp,status,message,errors` 네 필드 + `status`=실제 코드, `errors` 항상 배열) — `ErrorResponse` record가 네 필드를 갖고 핸들러가 `status.value()`를 그대로 담는다. `에러형태_400`, `에러형태_401`이 네 필드 존재와 status 일치를 검증하며 통과한다.
+- [ ] fail: 인수 조건 7 (`timestamp`가 정규식 `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(\.\d+)?Z$`와 일치) — **실질 요구(ISO-8601 UTC 문자열·epoch 아님)는 충족**하나, TRD에 명시된 이 정규식은 초(`:\d{2}`) 그룹이 빠져 있어 실제 출력과 불일치한다. 구현은 `ErrorResponse.of`가 `Instant.now().toString()`을 쓰며 이는 항상 초를 포함한다(예 `2026-07-21T10:08:34.933Z`). 이 문자열을 TRD 정규식에 `re.match` 하면 `False`(초 앞의 `:` 때문에 `Z` 매칭 실패). 반면 테스트 상수 `ISO_8601_UTC_REGEX`는 `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$`로 **TRD와 다른(초 포함) 정규식**을 써서 통과하므로, TRD가 문자열 그대로 요구한 조건은 실제로 검증되지 않았다. → 다음 TRD 재생성에서 정규식에 초 그룹(`:\d{2}`)을 추가해 테스트·출력과 일치시키는 것이 옳다(코드 변경 불필요).
+- [x] pass: 인수 조건 8 (`fe/` 미수정, 변경은 `be/`·루프 문서에 한정) — 이 워크트리에 `fe/` 폴더가 없고, `git diff --name-only main...HEAD`가 `DESIGN.md`·`IMPROVEMENTS.md`·`TRD.md`·`.superpowers/**`·`be/**`에만 걸린다. 작업 트리에는 컨트롤플레인 산출물인 `DONE` 삭제(`D DONE`)만 있고 `fe/` 경로는 없다.
+- [x] pass: 인수 조건 9 (항목별 성공·실패 `@WebMvcTest` 존재 + `clean build` 종료 코드 0) — 한국어 `@DisplayName`의 `AuthControllerTest` 14개가 성공·실패(400/401) 쌍을 이루며 `failures="0" errors="0"`로 통과하고, 새로 실행한 `./gradlew clean build`가 `BUILD SUCCESSFUL`·종료 코드 0으로 끝났다.
+
+_판정: fail 1건(인수 조건 7 — TRD 정규식이 실제 출력과 불일치, 테스트가 다른 정규식으로 우회)로 `.snploop/consistency-ok`는 `false`._
