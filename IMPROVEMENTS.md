@@ -130,3 +130,21 @@ _사이클 1 · trd-regen 페이즈. 교차검증 정합성이 전 항목 pass(`
 - 직전에 fix된 verify 실패였던 **로그아웃 세션 무효화**를 별도 인수 조건으로 승격했다(로그아웃 뒤 동일 쿠키 재전송 시 `GET /api/me`가 401). 회귀를 조기에 잡기 위함이다.
 - DESIGN.md 관찰 기록 조건에 프라이머리 `#3182f6`·본문 `#191f28`·보조 `#4e5968` 등 구체 색값과 구현 버튼 계산값(`rgb(49,130,246)`) 일치를 요구하도록 강화했다. `참고`·`용어`에 세션 쿠키 속성과 오류 본문 형태를 명시해 단일 소스를 보강했다.
 - 정합성 결과상 누락 조건이 없어 무의미한 항목 추가는 하지 않았다(세션 무효화 1건만 신설, 나머지는 정밀화).
+
+## 교차검증 정합성
+
+_사이클 1 · crossverify-consistency 페이즈. 현재 체크아웃에서 새 `:3000` 스텁 서버를 직접 기동하고, 기존 체크 표시와 과거 검증 기록을 신뢰하지 않은 채 TRD 인수 조건 13개를 빌드·계약 검사·agent-browser 실제 조작·소스 검토로 독립 재검증했다._
+
+- [x] pass: toss.im 관찰 결과와 구체적인 스타일 재현값 기록 — DESIGN.md 2절에 agent-browser 관찰 시점·뷰포트와 프라이머리 `#3182f6`, 본문 `#191f28`, 보조 `#4e5968`, 카드 최대 너비 420px·모서리 24px·안쪽 여백 32px가 기록돼 있다. 이번 agent-browser 계산 스타일에서도 `.primary-button` 배경이 `rgb(49, 130, 246)`, 카드 너비가 420px로 확인됐다.
+- [x] pass: 계약 스텁 3개의 상태코드·응답 필드·오류 형태·시드 계정 일치 — 새 서버 대상 `VERIFY_BASE_URL=http://127.0.0.1:3000 npm run verify:stub`이 공백 입력 400과 email·password 오류, 자격 불일치 401, 시드 로그인 200과 `{name:"토스사용자"}`·HttpOnly 쿠키, 인증 `/api/me` 200, 무쿠키 401, 로그아웃 204와 `Max-Age=0`을 모두 검사하고 종료 코드 0이었다. 검사 스크립트와 Route Handler를 함께 읽어 모든 오류가 `{timestamp,status,message,errors[]}`이며 timestamp가 ISO-8601로 검증됨을 확인했다.
+- [x] pass: 로그아웃 뒤 동일 세션 쿠키 재사용 거부 — `npm run verify:stub`이 로그인 때 받은 쿠키로 로그아웃한 뒤 같은 쿠키를 다시 전송한 `GET /api/me`의 401을 확인했고, `stub-auth.ts`는 활성 세션 Set에서 로그아웃 세션 식별자를 제거한다.
+- [x] pass: `/login` 미니멀 카드 폼 렌더링 — agent-browser DOM·계산 스타일 조회에서 `#email`의 type=email, `#password`의 type=password, 텍스트가 "로그인"인 버튼, `.auth-card`, 버튼 배경 `rgb(49, 130, 246)`을 확인했다.
+- [x] pass: 로그인 성공 시 홈으로 replace하고 401은 인라인 경고 표시 — 코드에서 성공 분기가 `router.replace('/')`를 사용하며, agent-browser로 잘못된 자격 제출 시 `/login` 유지와 "이메일 또는 비밀번호가 올바르지 않습니다." 경고를, 시드 계정 제출 시 `/` 이동과 `토스사용자님, 반가워요` 표시를 확인했다.
+- [x] pass: 400 필드 오류를 입력별 인라인 메시지로 표시 — agent-browser 실제 제출에서 공백 입력은 `#email-error`에 "이메일을 입력해 주세요.", `#password-error`에 "비밀번호를 입력해 주세요."를 동시에 표시했고, `bad-email`과 유효 비밀번호 제출은 이메일에만 "올바른 이메일 형식이 아닙니다."를 표시했다.
+- [x] pass: 홈 사용자 정보와 로그아웃 흐름 — 시드 로그인 뒤 홈에 `토스사용자님, 반가워요`와 `user@toss.local`이 나타났고, 로그아웃 버튼 실제 클릭 요청이 204였으며 URL이 `/login`으로 바뀌었다.
+- [x] pass: 미로그인 홈 접근 차단은 `/api/me` 401에 근거 — 쿠키 없는 고유 agent-browser 세션에서 `/` 직접 접근 시 네트워크 기록에 `GET /api/me` 401이 남고 URL이 `/login`으로 대체됐다. 홈 코드는 쿠키를 읽지 않고 `/api/me` 응답 상태만 분기한다.
+- [x] pass: 360px~1280px 반응형과 외부 자산 부재 — agent-browser에서 1280px와 360px 모두 `document.documentElement.scrollWidth === window.innerWidth`였고, 360px 카드 너비 320px·안쪽 여백 24px를 확인했다. `fe/app`, `fe/lib`, 설정·검증 스크립트 검색에서 외부 CDN·폰트·원격 이미지가 없었으며 URL은 허용된 :8080 rewrite와 localhost 검증 주소뿐이었다.
+- [x] pass: real 모드 rewrite와 UI 상대 API 경로 — `next.config.js`의 `rewrites()`를 직접 호출해 기본 모드 `[]`, real 모드 `[{"source":"/api/:path*","destination":"http://localhost:8080/api/:path*"}]`를 확인했다. UI의 `fetch` 3건은 각각 `/api/login`, `/api/me`, `/api/logout` 상대 경로다.
+- [x] pass: agent-browser 전체 실동작 — 이번 체크아웃의 새 `npm run dev:fresh` 서버에서 미로그인 홈 차단 → 401·400 오류 표시 → 시드 로그인 → 홈 리다이렉트와 사용자 표시 → 로그아웃 → 로그인 화면 복귀를 실제 입력·클릭으로 재현했고, 관련 브라우저 페이지 오류는 없었다.
+- [x] pass: `be/` 미수정 — 이 프론트 워크트리에 추적된 `be/` 파일이 없고 `git diff --name-only -- 'be/**'`도 빈 출력이었다.
+- [x] pass: 의존성 설치·취약점 검사·strict 빌드 — `npm ci`와 `npm audit --omit=dev`가 취약점 0건으로 종료 코드 0이었고, `npm run build`가 Next.js 컴파일·TypeScript strict 검사와 `/`, `/login`, 세 API Route 생성을 완료하며 종료 코드 0이었다.
