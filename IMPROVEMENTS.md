@@ -9,6 +9,15 @@ _Open items use "- [ ]". Empty Open list + green verify is the signal to create 
   - 근거 위치: `## Verify` > "2026-07-21 재생성 TRD(trd-regen) 이후 새 사이클 독립 verify" 블록의 인수 조건 1~9 항목.
   - 특히 인수 조건 7(정규식 글자 단위 동일성)은 TRD 문구와 테스트 상수 `ISO_8601_UTC_REGEX`를 문자 단위 비교해 `True`로 확인됨.
 
+## Implement
+
+- 사이클 2 · implement: DESIGN.md §10 점검·고정 항목을 하나씩 대조 검증했다. 사이클 1에서 재생성 TRD 인수 조건 9개를 이미 구현·검증했으므로 새 구조·새 코드는 만들지 않는 범위(§0)이며, 실제로 **코드 변경 없음**(어긋난 항목이 없어 최소 수정 대상이 없었다).
+  - 정규식 글자 단위 동일성(핵심): `AuthControllerTest`의 `ISO_8601_UTC_REGEX` 상수를 Java 이스케이프 해제한 런타임 값과 `TRD.md` 인수 조건 7의 정규식 `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$`를 문자 단위 비교 → `True`(완전 동일, 초 그룹 포함, 우회 없음). 샘플 `2026-07-21T10:08:34.933Z`가 양쪽 정규식에 매칭됨도 확인.
+  - HttpOnly 명시 설정: `application.yml`에 `server.servlet.session.cookie.http-only: true` 실존, 전용 테스트 `세션쿠키_HttpOnly_명시설정`이 `Environment` 프로퍼티 `"true"`를 단언.
+  - 경계·응답 형태: me 401 두 경계(a 세션없음 / b 세션有·속성無) 별도 테스트, 동시 입력오류 두 필드, 로그아웃 세션 유무 두 경우, 로그인 200 `aMapWithSize(1)`·me 200 `aMapWithSize(2)` 모두 존재.
+  - 빌드 재실행: `be/`에서 `./gradlew clean build --console=plain` → `BUILD SUCCESSFUL`, 종료 코드 `0`, `AuthControllerTest` `tests="17" skipped="0" failures="0" errors="0"`.
+  - 참고: `## Open`의 "VERIFY 재실행" 항목은 TRD 체크박스 토글을 요구하는 **VERIFY 작업**이므로 implement에서 체크하지 않았다(implement는 TRD 체크박스를 토글할 수 없음). 이번 사이클 verify가 처리한다.
+
 ## Verify
 
 - 2026-07-21 fresh verify: `be/`에서 `./gradlew clean build` 재실행 → `BUILD SUCCESSFUL`, 종료 코드 `0`, `AuthControllerTest` `tests="14" failures="0" errors="0"` 확인. `git diff --name-only main...HEAD`에도 `fe/` 경로 없음.
