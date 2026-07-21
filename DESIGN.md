@@ -6,11 +6,12 @@
 ## 1. 이번 사이클 범위
 
 TRD의 인수 조건 전체가 "세션 로그인 API 3종 + 공통 에러 처리"라는 하나의 응집된 묶음이다.
-잘게 쪼개면 오히려 세션 흐름(로그인→me→logout)을 끊어 검증하기 어렵다. 따라서 **이번 사이클에서
-백엔드 전체를 한 번에 구현·테스트**한다.
+현재 구현은 기본 흐름을 이미 갖추고 있으므로 구조를 다시 만들지 않는다. 이번 사이클은 재생성된
+TRD에 맞춰 **HttpOnly 정책을 명시 설정하고, 누락된 경계 조건을 테스트로 고정한 뒤 전체 계약을
+재검증**한다.
 
 - `POST /api/login`, `GET /api/me`, `POST /api/logout` 3개 엔드포인트
-- `HttpSession` + HttpOnly 쿠키 기반 세션
+- `HttpSession` + 명시적으로 HttpOnly가 설정된 `JSESSIONID` 쿠키 기반 세션
 - 인메모리 시드 계정 1개
 - `@RestControllerAdvice` 단일 예외 처리기 + 공통 에러 형태
 - 위 항목별 성공·실패 `@WebMvcTest` 테스트, `./gradlew clean build` 종료 코드 0
@@ -51,7 +52,7 @@ be/
       ErrorResponse.java        record {timestamp, status, message, errors[]}
       FieldErrorItem.java       record {field, message}   (errors[] 항목)
   src/main/resources/
-    application.yml             Jackson 날짜 직렬화 설정
+    application.yml             Jackson 날짜 직렬화 + HttpOnly 세션 쿠키 설정
   src/test/java/com/example/toss/
     auth/AuthControllerTest.java    @WebMvcTest 기반 인수 테스트
 ```
@@ -103,11 +104,10 @@ FieldErrorItem { String field, String message }
 ```
 
 - `errors[]`는 항상 존재하는 배열(자격/세션 오류에서도 빈 배열 `[]`).
-- `timestamp`는 ISO-8601(UTC) 문자열. `Instant.now()`를 Jackson `JavaTimeModule`로 직렬화하되
-  `application.yml`에 `spring.jackson.serialization.write-dates-as-timestamps: false`,
-  `spring.jackson.time-zone: UTC` 를 두어 epoch 숫자가 아닌 `2026-07-21T09:00:00Z` 형태로 나오게 한다.
-  (record 직렬화 안정성을 위해 핸들러에서 `Instant.now().toString()`으로 문자열을 만들어 담는 방식도 대안으로 검토 —
-  구현 단계에서 테스트로 형태를 고정한다.)
+- `timestamp`는 ISO-8601(UTC) 문자열이다. `ErrorResponse.of`가 `Instant.now().toString()` 결과를
+  문자열 필드에 담아 `2026-07-21T09:00:00Z` 형태를 확정한다. `application.yml`의
+  `spring.jackson.serialization.write-dates-as-timestamps: false`와 `spring.jackson.time-zone: UTC`도
+  전역 날짜 직렬화 정책으로 유지한다.
 
 ## 6. 데이터 흐름
 
@@ -119,7 +119,8 @@ POST /api/login {email,password}
  → request.getSession(true) 생성, 세션 속성 LOGIN_USER = {email,name} 저장
  → 200 {name:"토스사용자"} + Set-Cookie: JSESSIONID=…; HttpOnly
 ```
-톰캣 기본 세션 쿠키(`JSESSIONID`)는 기본적으로 `HttpOnly`. 별도 커스터마이징 없이 계약 충족.
+`application.yml`에 `server.servlet.session.cookie.http-only: true`를 명시해 컨테이너 기본값 변화와
+무관하게 쿠키 정책을 고정한다. `MockMvc`에서는 생성된 세션과 해당 설정값을 함께 검증한다.
 
 ### 로그인 실패 (자격 불일치 / 형식 오류)
 ```
@@ -135,28 +136,30 @@ POST /api/logout  → session.invalidate() → 204 (바디 없음)   이후 /api
 
 ## 7. 인수 조건 → 충족 방법 → 테스트 매핑
 
-전부 `AuthControllerTest`(`@WebMvcTest(AuthController.class)` + `@Import({AuthService.class, UserRepository.class})`,
-`ApiExceptionHandler`는 advice로 자동 스캔)에서 `MockMvc`로 검증한다. 세션은 `MockHttpSession` 및
-`andReturn().getRequest().getSession()`으로 다룬다. `@DisplayName`은 한국어 문장.
+전부 `AuthControllerTest`(`@WebMvcTest(AuthController.class)` +
+`@Import({AuthService.class, UserRepository.class, ApiExceptionHandler.class})`)에서 `MockMvc`로 검증한다.
+세션은 `MockHttpSession` 및 `andReturn().getRequest().getSession()`으로 다루고, 쿠키 정책은 테스트
+컨텍스트의 `Environment`에서 `server.servlet.session.cookie.http-only`를 읽어 검증한다.
+`@DisplayName`은 한국어 문장으로 작성한다.
 
 | # | 인수 조건 | 충족 방법 | 테스트 (성공/실패) |
 |---|-----------|-----------|--------------------|
-| A | 시드 계정 로그인 → 200 `{name}` + HttpOnly 세션 쿠키 | authenticate 성공 후 세션 저장, `{name}` 반환 | 성공: 200 + `$.name=토스사용자` + `Set-Cookie` HttpOnly 검증. 실패쌍은 B로 |
-| B | 자격 불일치 → 401 공통 에러 | `InvalidCredentialsException` → 핸들러 401 | 실패: 틀린 비밀번호로 401 + `$.status=401` + `$.errors` 빈 배열 |
-| C | 형식 오류·공백 → 400, `errors[]` 필드별 | `@Valid` 검증 실패 → 400, BindingResult 매핑 | 실패: `email` 무효/`password` 공백 요청 → 400 + `$.errors[*].field` 에 `email`,`password` 포함. 성공쌍은 A |
-| D | me: 세션有 200 `{email,name}` / 세션無 401 | 세션 속성 조회, 없으면 `UnauthorizedException` | 성공: 세션 주입 후 200 + `$.email`,`$.name`. 실패: 세션 없이 401 |
-| E | logout: 204 + 세션 무효화, 직후 me 401 | `session.invalidate()` 후 204 | 성공: 204 + 세션 `isInvalid()`. 실패측: 무효화된 세션으로 me 호출 → 401 |
-| F | 모든 에러가 `{timestamp,status,message,errors[]}`, `status`=실제 코드 | 모든 예외를 `ErrorResponse`로 통일 | 400·401 각각에서 네 필드 존재 + `$.status` 값이 HTTP 코드와 일치 검증 |
-| G | `timestamp` ISO-8601(UTC) 문자열 | Jackson UTC + non-timestamp 설정 | 에러 응답 `$.timestamp` 가 `…Z`(또는 오프셋) ISO 패턴 정규식 매칭 |
-| H | `fe/` 미수정 | 작업을 `be/`에 국한 | 검증: `git diff --name-only` 에 `fe/` 경로 없음 (VERIFY 단계 확인) |
-| I | 항목별 성공·실패 `@WebMvcTest` + `clean build` 0 | 위 테스트 일체 + Gradle 빌드 | `./gradlew clean build` 종료 코드 0 |
+| A | 시드 계정 로그인 → 200 정확한 `{name}` + 세션 생성 + HttpOnly 명시 설정 | 기존 로그인 흐름 유지, `application.yml`에 `server.servlet.session.cookie.http-only: true` 추가 | 200, `$.name=토스사용자`, 최상위 필드 1개, 새 세션과 `LOGIN_USER` 확인, `Environment` 설정값이 `true`인지 검증 |
+| B | 미등록 이메일·틀린 비밀번호 → 각각 401 공통 에러 | `InvalidCredentialsException` → 핸들러 401 | 두 입력을 독립 테스트하고 HTTP 401, `$.status=401`, `$.errors`가 빈 배열인지 모두 검증 |
+| C | 잘못된 이메일 형식·이메일 공백·비밀번호 공백 → 각각 400와 필드 오류 | `@Valid` 검증 실패 → 400, `BindingResult`를 `{field,message}`로 매핑 | 세 입력을 독립 테스트하고 대상 `field`가 존재하며 대응 `message`가 빈 문자열이 아닌지 검증 |
+| D | me: 로그인 세션은 정확한 `{email,name}`, 세션/사용자 속성 부재는 401 | 세션의 `LOGIN_USER` 조회, 없으면 `UnauthorizedException` | 성공 응답 최상위 필드 2개와 값을 확인. 세션 자체 없음과 속성 없는 세션을 각각 401 공통 에러로 검증 |
+| E | logout: 세션 유무와 무관하게 빈 본문 204, 기존 세션 무효화 | 세션이 있을 때만 `invalidate()`, 항상 204 | 세션 있음/없음 각각 204와 빈 본문 확인. 기존 세션 `isInvalid()` 및 후속 me 401 검증 |
+| F | 400·401 모두 정확한 공통 에러 구조 | 알려진 계약 예외를 `ApiExceptionHandler`에서 `ErrorResponse`로 통일 | 각 상태에서 최상위 필드가 정확히 4개인지, `status`와 HTTP 코드가 같은지, `errors`가 배열인지 검증 |
+| G | `timestamp`가 ISO-8601 UTC 문자열 | `Instant.now().toString()`으로 생성 | `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$` 정규식과 일치시켜 숫자 epoch·비 UTC 오프셋을 배제 |
+| H | `fe/` 미수정 | 구현 변경을 `be/`와 루프 문서로 제한 | `git diff --name-only main...HEAD`와 `git status --short`에서 `fe/` 경로가 없는지 확인 |
+| I | 강화된 요청 행렬 전체를 `@WebMvcTest`로 검증 + `clean build` 0 | 위 테스트 일체와 Gradle Wrapper 빌드 | 테스트 XML의 failures/errors 0 및 `./gradlew clean build`의 `BUILD SUCCESSFUL`·종료 코드 0 확인 |
 
 ## 8. 핵심 결정 (근거)
 
 1. **세션 저장 값은 최소 DTO(email, name)** — `SeedUser`(비밀번호 포함)를 세션에 직접 넣지 않는다.
    me 응답에 필요한 값만 담아 노출면을 줄인다.
-2. **HttpOnly 쿠키는 서블릿 컨테이너 기본(JSESSIONID)에 위임** — 계약이 요구하는 HttpOnly가 기본값이라
-   추가 설정 없이 충족. Spring Security 도입 없이 단순 유지(TRD Out of scope: 복잡 인증 금지).
+2. **HttpOnly 정책을 설정 파일에 명시** — `server.servlet.session.cookie.http-only: true`로 프레임워크
+   기본값에 의존하지 않는다. Spring Security를 추가하지 않고 기존 `HttpSession` 구조를 유지한다.
 3. **`@RestControllerAdvice` 단일 핸들러** — 컨트롤러 try/catch·수동 null 체크를 없애고 에러 형태를 한곳에 고정.
    401은 커스텀 예외 2종(`InvalidCredentials`/`Unauthorized`)으로 의미를 구분하되 응답 형태는 동일.
 4. **검증은 선언형(`jakarta.validation`)** — `@Email`,`@NotBlank`로 400을 자동화. 필드별 메시지가
@@ -169,15 +172,18 @@ POST /api/logout  → session.invalidate() → 204 (바디 없음)   이후 /api
 ## 9. 테스트 전략 요약
 
 - 프레임워크: JUnit 5 + AssertJ, 웹 계층 `@WebMvcTest` + `MockMvc`. **테스트 먼저 작성**(implement 페이즈).
-- 각 인수 조건마다 성공·실패(400/401) 케이스를 모두 둔다.
+- 기존 테스트를 먼저 강화해 새 TRD와의 차이가 실패로 드러나는지 확인한 뒤 설정을 최소 수정한다.
+- 경계 입력은 잘못된 이메일 형식, 이메일 공백, 비밀번호 공백을 각각 독립 테스트한다.
+- 세션 오류는 세션 없음과 세션은 있으나 `LOGIN_USER` 속성이 없는 경우를 각각 테스트한다.
+- 응답의 "정확히"는 기대 필드 값뿐 아니라 최상위 필드 개수까지 검사해 여분 필드 회귀를 막는다.
 - 세션 시나리오: 로그인 성공 응답의 세션을 재사용해 me 200 → logout 204 → me 401 로 이어지는 흐름을 별도 테스트로도 확인.
 - 프론트·통합 실행은 이 루프 범위 밖. 별도 통합 실행 테스트를 추가하지 않는다.
 
 ## 10. 다음 페이즈(implement)로 넘기는 작업 목록
 
-1. `be/` Gradle Kotlin DSL 스캐폴드 + Wrapper 생성, `TossApplication`.
-2. `AuthControllerTest` 부터 작성(실패하는 테스트) → 각 인수 조건 성공/실패 케이스.
-3. DTO `record` 4종 + 예외 2종 + `ErrorResponse`/`FieldErrorItem`.
-4. `UserRepository`(시드), `AuthService`, `AuthController`, `ApiExceptionHandler` 구현.
-5. `application.yml` Jackson UTC 설정.
-6. `./gradlew clean build` 녹색 확인.
+1. `AuthControllerTest`에 HttpOnly 설정 검증을 먼저 추가해 실패를 확인한다.
+2. `application.yml`에 `server.servlet.session.cookie.http-only: true`를 추가해 테스트를 통과시킨다.
+3. 이메일 공백, 사용자 속성 없는 세션, 정확한 응답 필드 수, 204 빈 본문 테스트를 보강한다.
+4. 자격 오류 2종과 입력 오류 3종 각각에서 공통 에러 구조·필드 메시지를 빠짐없이 검증한다.
+5. `git diff --name-only main...HEAD`와 작업 트리에서 `fe/` 변경이 없음을 확인한다.
+6. `./gradlew clean build`를 새로 실행해 테스트 실패 없이 종료 코드 0인지 확인한다.
