@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: toss-back
+  jackson:
+    time-zone: UTC
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: 8080
+  servlet:
+    session:
+      cookie:
+        http-only: true
