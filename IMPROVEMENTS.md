@@ -5,6 +5,10 @@ _Open items use "- [ ]". Empty Open list + green verify is the signal to create 
 
 ## Open
 
+- [ ] VERIFY 재실행: TRD.md 인수 조건 9개(라인 23~31)가 모두 `- [ ]`로 남아 있다. 이번 사이클 VERIFY가 `## Verify`에 9개 전부에 대한 green 근거(빌드 종료 코드 0, 테스트 17개 `failures="0" errors="0"`, 항목별 코드·설정·실 서버 대조)를 기록했으나 **TRD.md의 체크박스를 토글하지 않았다**(verify 페이즈 3단계 누락). 체크는 VERIFY만 할 수 있고 EVALUATE는 되돌리기만 가능하므로, 다음 VERIFY 패스에서 코드 변경 없이 아래 근거대로 9개 박스를 `- [x]`로 표시하면 된다. 새 구현 작업은 필요 없다(현재 빌드·테스트 이미 green).
+  - 근거 위치: `## Verify` > "2026-07-21 재생성 TRD(trd-regen) 이후 새 사이클 독립 verify" 블록의 인수 조건 1~9 항목.
+  - 특히 인수 조건 7(정규식 글자 단위 동일성)은 TRD 문구와 테스트 상수 `ISO_8601_UTC_REGEX`를 문자 단위 비교해 `True`로 확인됨.
+
 ## Verify
 
 - 2026-07-21 fresh verify: `be/`에서 `./gradlew clean build` 재실행 → `BUILD SUCCESSFUL`, 종료 코드 `0`, `AuthControllerTest` `tests="14" failures="0" errors="0"` 확인. `git diff --name-only main...HEAD`에도 `fe/` 경로 없음.
@@ -46,6 +50,11 @@ _TRD.md의 인수 조건 9개가 모두 `- [ ]`로 초기화된 상태에서, im
 - 사이클 1 · evaluate: VERIFY의 `- [x]` 9개를 실제 코드(`AuthController`, `ApiExceptionHandler`, `ErrorResponse`)와 `AuthControllerTest`(14개) 대조로 재검토 → 근거 충실, 되돌릴 항목 없음.
 - 인수 조건 A의 HttpOnly 쿠키는 `@WebMvcTest`가 Set-Cookie 헤더를 검증하지 않는 한계가 있으나, VERIFY가 실 Tomcat + `curl -i`로 `HttpOnly` 실측해 보완 → 유효한 근거로 인정.
 - TRD.md 인수 조건 9개 전부 `- [x]`, Open 항목 0개, 마지막 VERIFY green → 루프 종료 조건 충족. 저장소 루트에 빈 `DONE` 파일 생성.
+
+- 사이클 1 · evaluate (재생성 TRD 이후): 재생성으로 초기화된 TRD.md 인수 조건 9개를 이번 사이클 산출물과 대조 재검토했다. `./gradlew clean build` 재실행 종료 코드 0, `AuthControllerTest` `tests="17" failures="0" errors="0"`을 직접 재확인했고, `## Verify`의 이번 패스 근거가 9개 항목 모두에 대해 충실함을 확인했다(되돌릴 근거 부실 항목 없음).
+- **DONE 미생성 사유**: 완료 조건은 "TRD 인수 조건 전부 `- [x]` + 마지막 VERIFY green"인데, VERIFY가 green 근거는 남겼으나 TRD.md 체크박스를 토글하지 않아 9개 모두 `- [ ]` 상태다. EVALUATE는 체크를 되돌릴 수만 있고 새로 추가할 수 없으므로(훅 차단), 이 사이클에서는 DONE을 만들 수 없다. 억지로 조건을 완화하지 않고 루프를 이어간다.
+- **되돌린 체크 없음**: TRD.md에 `- [x]` 항목이 하나도 없어(전부 `- [ ]`) 되돌릴 대상이 없다. 근거 부실로 인한 강등도 해당 없음.
+- **다음 단계**: 위 `## Open`에 기록한 대로, 다음 VERIFY 패스가 이미 기록된 green 근거를 바탕으로 9개 박스를 `- [x]`로 표시하면 루프가 종료 조건에 도달한다. 코드·테스트 변경은 필요 없다.
 
 ## Verify failures
 
