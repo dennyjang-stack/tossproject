@@ -21,6 +21,18 @@ _Open items use "- [ ]". Empty Open list + green verify is the signal to create 
 
 ## Verify
 
+- 2026-07-21 최신 verify: `be/`에서 `./gradlew clean build --console=plain` 실행 → `BUILD SUCCESSFUL`, 종료 코드 `0`, `AuthControllerTest` `tests="18" skipped="0" failures="0" errors="0"` 확인.
+- 인수 조건 1: `AuthControllerTest#로그인_성공`, `#로그인_성공_응답필드_하나뿐`, `#세션쿠키_HttpOnly_명시설정`과 `be/src/main/resources/application.yml`의 `server.servlet.session.cookie.http-only: true`로 로그인 200·`name` 단일 필드·HttpOnly 명시 설정을 확인했다.
+- 인수 조건 2: `AuthControllerTest#로그인_비밀번호_불일치`와 `#로그인_존재하지않는_이메일`이 각각 401, 비어 있지 않은 `message`, 빈 `errors[]`를 검증한다.
+- 인수 조건 3: `AuthControllerTest#로그인_이메일_형식_오류`, `#로그인_이메일_공백`, `#로그인_비밀번호_공백`, `#로그인_이메일_비밀번호_동시_형식오류`로 400 경계와 필드별 `{field, message}` 및 동시 오류 두 필드 담김을 확인했다.
+- 인수 조건 4: `AuthControllerTest#me_세션있음`, `#me_세션없음`, `#me_세션있으나_로그인속성없음`으로 로그인 세션 200·세션 없음 401·세션 있으나 속성 없음 401을 확인했다.
+- 인수 조건 5: `AuthControllerTest#로그아웃_성공_이후_me_401`, `#로그아웃_세션없어도_204`와 `MockHttpSession.isInvalid()`로 로그아웃 204·빈 본문·세션 무효화·후속 me 401을 확인했다.
+- 인수 조건 6: `AuthControllerTest#에러형태_400`, `#에러형태_401`과 `ApiExceptionHandler`/`ErrorResponse` 구현으로 400·401 에러가 정확히 `timestamp`, `status`, `message`, `errors` 네 키만 갖고 `status`가 실제 코드와 일치함을 확인했다.
+- 인수 조건 7: `AuthControllerTest#timestamp_ISO8601_UTC`의 정규식 상수 `ISO_8601_UTC_REGEX`와 `ErrorResponse.of(Instant.now().toString())`를 대조해 초를 포함한 ISO-8601 UTC 문자열 규칙이 코드·테스트에서 동일함을 확인했다.
+- 인수 조건 8: `git status --porcelain`에는 `fe/` 변경이 없고, `git diff --name-only main...HEAD`에도 `fe/` 경로가 없으며 변경은 `be/`와 루프 문서로만 한정됨을 확인했다.
+- 인수 조건 9: 한국어 `@DisplayName`의 `@WebMvcTest` + `MockMvc` 테스트 18개가 모두 통과했고, 새 `./gradlew clean build`가 종료 코드 0으로 끝났다.
+- cycle green: 모든 테스트 통과
+
 - 2026-07-21 fresh verify: `be/`에서 `./gradlew clean build` 재실행 → `BUILD SUCCESSFUL`, 종료 코드 `0`, `AuthControllerTest` `tests="14" failures="0" errors="0"` 확인. `git diff --name-only main...HEAD`에도 `fe/` 경로 없음.
 - cycle green: 모든 테스트 통과
 - 빌드: `be/`에서 `./gradlew clean build` 실행 → **BUILD SUCCESSFUL**, 종료 코드 **0** 확인 (파이프 없이 `$?` 직접 캡처로 재확인).

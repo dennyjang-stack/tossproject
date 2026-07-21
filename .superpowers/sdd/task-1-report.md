@@ -25,3 +25,13 @@
 - 실패 없이 통과: `tests="18" skipped="0" failures="0" errors="0"`
 - 변경 범위: `be/`와 루프 문서만 수정했다.
 - `fe/`는 건드리지 않았다.
+
+## 2026-07-21 VERIFY 추가 기록
+
+- 검증 명령: `cd be && ./gradlew clean build --console=plain`
+- 결과: `BUILD SUCCESSFUL`, 종료 코드 `0`
+- 테스트 결과: `AuthControllerTest` `tests="18" skipped="0" failures="0" errors="0"`
+- 문서 갱신: `TRD.md`의 인수 조건 9개를 모두 `- [x]`로 반영했다.
+- 문서 근거: `IMPROVEMENTS.md`의 `## Verify`에 인수 조건별 확인 근거와 `cycle green: 모든 테스트 통과`를 추가했다.
+- 변경 범위 확인: `git status --porcelain`과 `git diff --name-only main...HEAD`에서 `fe/` 경로는 보이지 않았고, 변경은 `be/`와 루프 문서에만 한정됐다.
+- 비고: 이번 사이클에서는 소스 코드를 수정하지 않았고, 검증·문서 반영만 수행했다.
