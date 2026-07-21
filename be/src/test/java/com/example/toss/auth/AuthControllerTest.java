@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.env.Environment;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
@@ -38,6 +39,9 @@ class AuthControllerTest {
 	@Autowired
 	private ObjectMapper objectMapper;
 
+	@Autowired
+	private Environment environment;
+
 	// ---------- A. 로그인 성공 ----------
 
 	@Test
@@ -55,6 +59,13 @@ class AuthControllerTest {
 		assertThat(session.isNew()).isTrue();
 		assertThat(session.getAttribute(AuthService.SESSION_USER))
 				.isEqualTo(new MeResponse(SEED_EMAIL, SEED_NAME));
+	}
+
+	@Test
+	@DisplayName("A-설정: 세션 쿠키의 HttpOnly 설정이 명시적으로 true다")
+	void 세션쿠키_HttpOnly_명시설정() {
+		assertThat(environment.getProperty("server.servlet.session.cookie.http-only"))
+				.isEqualTo("true");
 	}
 
 	// ---------- B. 자격 불일치 ----------
