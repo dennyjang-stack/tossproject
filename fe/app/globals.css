@@ -18,8 +18,8 @@
   --radius-pill: 999px;
   --content-width: 420px;
   --page-pad: 20px;
-  --font-stack: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo',
-    'Malgun Gothic', sans-serif;
+  --font-stack: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic',
+    sans-serif;
 }
 
 * {

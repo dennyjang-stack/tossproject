@@ -21,4 +21,5 @@ _Open items use "- [ ]". Empty Open list + green verify is the signal to create 
 
 ## Verify failures
 
-- [ ] fix: :3000을 점유한 기존 개발 서버가 `/_next/static/*` 청크를 404로 반환하여 홈의 인증 스크립트가 실행되지 않았고, agent-browser의 :3000 로그인 → 홈 → 로그아웃 실동작을 확인할 수 없었다 (기존 :3000 프로세스)
+- [x] fix: `npm run dev:fresh`가 :3000 점유를 먼저 감지해 기존 개발 서버를 건드리지 않고 실패하도록 하고, `npm run verify:stub`으로 새 서버의 계약 흐름을 반복 검증할 수 있게 했다.
+- [ ] 환경 제약: 기존 :3000 프로세스가 점유한 상태라 해당 포트에서의 새 서버 브라우저 여정은 재실행하지 못했다. 프로세스 종료는 이 작업 범위 밖이므로, 새 서버를 시작할 수 있는 환경에서 `npm run dev:fresh` 뒤 agent-browser로 확인해야 한다.
