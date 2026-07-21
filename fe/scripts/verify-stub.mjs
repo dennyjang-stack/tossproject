@@ -10,6 +10,40 @@ function assert(condition, message) {
   }
 }
 
+function assertExactKeys(value, expectedKeys, description) {
+  const actualKeys = Object.keys(value).sort();
+  const sortedExpectedKeys = [...expectedKeys].sort();
+  assert(
+    JSON.stringify(actualKeys) === JSON.stringify(sortedExpectedKeys),
+    `${description}의 키는 ${sortedExpectedKeys.join(', ')}만 있어야 합니다.`,
+  );
+}
+
+function assertUtcTimestamp(value) {
+  assert(
+    typeof value === 'string' && value.endsWith('Z') && !Number.isNaN(Date.parse(value)),
+    'timestamp가 유효한 UTC Z ISO-8601 시간이어야 합니다.',
+  );
+}
+
+function assertCookieAttributes(header, { logout = false } = {}) {
+  assert(typeof header === 'string', 'Set-Cookie 헤더가 있어야 합니다.');
+  const [cookie, ...attributes] = header.split(';').map((part) => part.trim());
+  const normalizedAttributes = attributes.map((attribute) => attribute.toLowerCase());
+
+  assert(cookie.startsWith('toss_session='), '쿠키 이름이 toss_session이어야 합니다.');
+  assert(normalizedAttributes.includes('path=/'), '쿠키에 Path=/ 속성이 있어야 합니다.');
+  assert(normalizedAttributes.includes('httponly'), '쿠키가 HttpOnly여야 합니다.');
+  assert(normalizedAttributes.includes('samesite=lax'), '쿠키에 SameSite=Lax 속성이 있어야 합니다.');
+
+  if (logout) {
+    assert(cookie === 'toss_session=', '로그아웃 쿠키 값이 빈 값이어야 합니다.');
+    assert(normalizedAttributes.includes('max-age=0'), '로그아웃 쿠키에 Max-Age=0 속성이 있어야 합니다.');
+  } else {
+    assert(cookie.length > 'toss_session='.length, '로그인 쿠키에 세션 값이 있어야 합니다.');
+  }
+}
+
 async function readJson(response) {
   try {
     return await response.json();
@@ -20,10 +54,17 @@ async function readJson(response) {
 
 function assertErrorPayload(payload, status) {
   assert(payload && typeof payload === 'object', '오류 본문이 객체여야 합니다.');
+  assertExactKeys(payload, ['timestamp', 'status', 'message', 'errors'], '오류 본문');
   assert(payload.status === status, `오류 상태가 ${status}여야 합니다.`);
   assert(typeof payload.message === 'string', '오류 메시지가 문자열이어야 합니다.');
   assert(Array.isArray(payload.errors), 'errors가 배열이어야 합니다.');
-  assert(typeof payload.timestamp === 'string' && !Number.isNaN(Date.parse(payload.timestamp)), 'timestamp가 ISO-8601 시간이어야 합니다.');
+  assertUtcTimestamp(payload.timestamp);
+  payload.errors.forEach((error) => {
+    assert(error && typeof error === 'object', '필드 오류가 객체여야 합니다.');
+    assertExactKeys(error, ['field', 'message'], '필드 오류');
+    assert(typeof error.field === 'string', '필드 오류의 field가 문자열이어야 합니다.');
+    assert(typeof error.message === 'string', '필드 오류의 message가 문자열이어야 합니다.');
+  });
 }
 
 const invalid = await fetch(`${baseUrl}/api/login`, {
@@ -53,8 +94,7 @@ const login = await fetch(`${baseUrl}/api/login`, {
 assert(login.status === 200, '시드 계정 로그인은 200이어야 합니다.');
 assert((await readJson(login)).name === '토스사용자', '로그인 응답 이름이 일치해야 합니다.');
 const setCookie = login.headers.get('set-cookie');
-assert(setCookie?.startsWith('toss_session='), '로그인 응답에 세션 쿠키가 있어야 합니다.');
-assert(setCookie?.includes('HttpOnly'), '세션 쿠키가 HttpOnly여야 합니다.');
+assertCookieAttributes(setCookie);
 const cookie = setCookie.split(';', 1)[0];
 
 const me = await fetch(`${baseUrl}/api/me`, { headers: { cookie } });
@@ -64,7 +104,7 @@ assert(meBody.email === 'user@toss.local' && meBody.name === '토스사용자', 
 
 const logout = await fetch(`${baseUrl}/api/logout`, { method: 'POST', headers: { cookie } });
 assert(logout.status === 204, '로그아웃은 204여야 합니다.');
-assert(logout.headers.get('set-cookie')?.includes('Max-Age=0'), '로그아웃이 세션 쿠키를 만료시켜야 합니다.');
+assertCookieAttributes(logout.headers.get('set-cookie'), { logout: true });
 
 const replayed = await fetch(`${baseUrl}/api/me`, { headers: { cookie } });
 assert(replayed.status === 401, '로그아웃 뒤 같은 세션 쿠키를 재전송한 /api/me은 401이어야 합니다.');
