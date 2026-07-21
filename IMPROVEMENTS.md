@@ -22,4 +22,10 @@ _Open items use "- [ ]". Empty Open list + green verify is the signal to create 
 - 코딩 제약 점검: 생성자 주입/`final`만 사용(`AuthController`, `AuthService`에 필드 `@Autowired` 없음, `grep -rn "@Autowired" src/main` 결과 없음), Lombok 미사용(`build.gradle.kts`·`src/main` 어디에도 `lombok` 없음), DTO 6종 모두 `record`(`LoginRequest`,`LoginResponse`,`MeResponse`,`SeedUser`,`ErrorResponse`,`FieldErrorItem`), 컨트롤러(`AuthController.java`)에 `try`/`catch` 없음, `@RestControllerAdvice`는 `ApiExceptionHandler` 단 하나만 존재, 검증은 `jakarta.validation`의 `@NotBlank`/`@Email` 선언형으로 처리(수동 null 체크 없음). 모두 충족.
 - 스택/구조 점검: Java 21 toolchain, Spring Boot 3.5.16, Gradle Kotlin DSL(`build.gradle.kts`/`settings.gradle.kts`, Groovy 없음), 외부 DB·Docker·JWT/OAuth 미사용, 패키지 구조가 `auth/`,`common/` feature-by-package로 DESIGN.md와 일치. 충족.
 
+## Evaluate
+
+- 사이클 1 · evaluate: VERIFY의 `- [x]` 9개를 실제 코드(`AuthController`, `ApiExceptionHandler`, `ErrorResponse`)와 `AuthControllerTest`(13개) 대조로 재검토 → 근거 충실, 되돌릴 항목 없음.
+- 인수 조건 A의 HttpOnly 쿠키는 `@WebMvcTest`가 Set-Cookie 헤더를 검증하지 않는 한계가 있으나, VERIFY가 실 Tomcat + `curl -i`로 `HttpOnly` 실측해 보완 → 유효한 근거로 인정.
+- TRD.md 인수 조건 9개 전부 `- [x]`, Open 항목 0개, 마지막 VERIFY green → 루프 종료 조건 충족. 저장소 루트에 빈 `DONE` 파일 생성.
+
 ## Verify failures
