@@ -172,3 +172,21 @@ _사이클 1 · trd-regen 페이즈. 최신 교차검증 정합성이 13개 전 
 - 계약 조건은 성공·로그아웃 쿠키의 `Path=/`·`HttpOnly`·`SameSite=Lax`·`Max-Age=0`, 오류 JSON의 정확한 최상위 키·필드 오류 키·UTC `Z` timestamp까지 검사하도록 구체화했다.
 - 로그인 성공 조건은 뒤로가기로 `/login`에 복귀하지 않는 히스토리 검사를 명시하고, 전체 브라우저 조건은 현재 체크아웃의 새 서버·고유 세션·400/401 경계 입력·오류 오버레이 및 콘솔/페이지 오류 부재를 요구하도록 강화했다.
 - 완료 조건은 `npm audit --omit=dev` 취약점 0건과 빌드가 생성해야 할 화면·API Route까지 명시했다. 정합성에서 새 결함이나 판단 보류가 나오지 않아 별도 인수 조건은 추가하지 않았다.
+
+## 교차검증 정합성
+
+_사이클 1 · crossverify-consistency 페이즈. 이전 세대 산출물을 체크박스에 의존하지 않고 빌드·계약 검증·agent-browser 실동작으로 독립 재검토했다. `.snploop/xverify-bootstrapped`가 없어 최초 정합성 판정을 수행했다._
+
+- [x] pass: DESIGN.md 재현 포인트 기록 + 버튼 색 — DESIGN.md에 `#3182f6`·`#191f28`·`#4e5968`·카드 너비 `420px`·모서리 `24px`가 구체적 값으로 기록돼 있고, agent-browser에서 `.primary-button`의 계산 배경색이 `rgb(49, 130, 246)`으로 이 기록과 일치했다.
+- [x] pass: 계약 스텁 3개 글자 단위 일치 — `npm run dev:fresh`(스텁 :3000)에서 `npm run verify:stub`이 종료 코드 0으로, 공백 400(email·password 둘 다)·오자격 401·시드 200 `{name:"토스사용자"}`·`Set-Cookie: toss_session=…; Path=/; HttpOnly; SameSite=Lax`·`/api/me` 유효 200/무쿠키 401·로그아웃 204(빈 값·`Max-Age=0`)와 오류 본문 4키·`field`/`message`·UTC `Z` timestamp를 모두 통과했다.
+- [x] pass: 로그아웃 뒤 동일 쿠키 재전송 401 — `verify-stub.mjs`의 재전송 검사(같은 `cookie`로 `/api/me` 재요청 → 401)가 통과했고, `stub-auth.ts`의 `invalidateSession`이 세션 레지스트리에서 세션 ID를 실제 삭제한다.
+- [x] pass: `/login` 폼 렌더 — agent-browser로 `#email`(`type=email`)·`#password`(`type=password`)와 "로그인" 버튼이 카드 폼에 있고 버튼 배경이 `rgb(49, 130, 246)`임을 확인했다.
+- [x] pass: 로그인 성공 `router.replace('/')`와 히스토리 — 시드 제출 후 경로가 `/`, 홈에 `토스사용자`가 표시됐고, `history.back()` 시 직전 `/login`이 아니라 초기 blank로 이동해 로그인 페이지가 히스토리에 남지 않음을 확인했다. 오자격 401 제출 시 경로는 `/login`을 유지하며 인라인 경고 "이메일 또는 비밀번호가 올바르지 않습니다."가 표시됐다.
+- [x] pass: 400 필드별 인라인 메시지 — 공백 제출 시 `#email-error`·`#password-error`가 둘 다 채워졌고, `bad-email` 제출 시 이메일 필드에만 "올바른 이메일 형식이 아닙니다."가 표시되고 비밀번호 오류는 비었다.
+- [x] pass: 홈 사용자 표시와 로그아웃 흐름 — 홈에 `토스사용자님, 반가워요`와 `user@toss.local`이 나타났고, 로그아웃 버튼 클릭 후 경로가 `/login`으로 바뀌었다.
+- [x] pass: 미로그인 홈 접근 차단 — 로그아웃 뒤 `/`로 재접근하자 `/login`으로 리다이렉트됐다. 홈 코드(`app/page.tsx`)는 쿠키를 직접 읽지 않고 `GET /api/me`의 401 응답 상태만으로 분기한다.
+- [x] pass: 360px~1280px 가로 스크롤 부재 + 외부 자산 없음 — 360px·1280px 두 뷰포트 모두 `document.documentElement.scrollWidth === window.innerWidth`였고, `fe/app`·`fe/lib`·설정/스크립트 검색에서 허용된 `:8080` rewrite·localhost 검증 주소 외 외부 CDN·폰트·원격 이미지·`@import`가 없었다.
+- [x] pass: real 모드 rewrite + 상대 API 경로 — `next.config.js`의 `rewrites()`를 직접 호출해 기본 모드 `[]`, `NEXT_PUBLIC_API_MODE=real` 모드 `[{"source":"/api/:path*","destination":"http://localhost:8080/api/:path*"}]`을 확인했고, UI의 `fetch`는 `/api/login`·`/api/me`·`/api/logout` 상대 경로만 사용한다.
+- [x] pass: agent-browser 전체 실동작 — 이번 체크아웃의 새 `dev:fresh` 서버에서 미로그인 홈 차단 → 400·401 오류 표시 → 시드 로그인 → 홈 리다이렉트·사용자 표시 → 로그아웃 → 로그인 복귀를 실제 입력·클릭으로 재현했다. 업케치 JS 예외(page error)는 0건, Next.js 오류 오버레이도 없었다. 콘솔의 400/401 "Failed to load resource"는 경계 입력을 검증하는 과정에서 스텁이 의도적으로 반환한 상태코드로, 애플리케이션 결함이 아니다. `dev-fresh.mjs`는 :3000 점유 시 포트를 선점 검사해 안전하게 종료 코드 1로 실패한다.
+- [x] pass: `be/` 미수정 — 이 프론트 워크트리에 `be/` 디렉터리 자체가 없고 `git diff --name-only`에 `be/` 경로가 없다.
+- [x] pass: 설치·감사·strict 빌드 — `npm ci`(0 vuln)·`npm audit --omit=dev`(0 vuln)·`npm run build`가 모두 종료 코드 0이었고, 빌드가 TypeScript strict 검사와 `/`·`/login`·`/api/login`·`/api/me`·`/api/logout` 5개 라우트 생성을 완료했다.
