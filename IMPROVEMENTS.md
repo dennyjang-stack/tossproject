@@ -7,6 +7,22 @@ _Open items use "- [ ]". Empty Open list + green verify is the signal to create 
 
 ## Verify
 
+- 2026-07-21 사이클 1(재생성 TRD) verify 재실행: `cd fe && npm ci`(종료 0, 0 vulnerabilities), `npm audit --omit=dev`(종료 0, 0 vulnerabilities), `npm run build`(종료 0, TypeScript strict 통과, `/`·`/login`·`/api/login`·`/api/logout`·`/api/me` 5개 라우트 생성)를 모두 재확인했다.
+- 2026-07-21 verify: 포트 :3000이 비어 있음을 확인한 뒤 `npm run dev:fresh`로 `.next-dev` 산출물의 새 스텁 서버를 정상 기동했고(안전 실패 경로는 이번엔 해당 없음), `npm run verify:stub`이 종료 코드 0으로 통과했다 — `scripts/verify-stub.mjs`가 공백 400(email·password `errors[]`), 오자격 401, 시드 200 `{name:"토스사용자"}`+`Set-Cookie: toss_session=…; Path=/; HttpOnly; SameSite=Lax`, `/api/me` 인증 200/무쿠키 401, 로그아웃 204(빈 값·`Path=/`·`HttpOnly`·`SameSite=Lax`·`Max-Age=0`), **로그아웃 뒤 동일 쿠키 재전송 `/api/me` 401**, 모든 오류 본문의 정확한 키(`timestamp`,`status`,`message`,`errors`)·UTC `Z` timestamp·필드 오류 키(`field`,`message`)를 단언해 통과했다.
+- 2026-07-21 verify: agent-browser 새 격리 창(1280×800, 고유 세션)에서 쿠키 없이 `/` 접근 → `/login` 리다이렉트를 `browser_get url`로 확인했고, `browser_evaluate`로 `#email`(type=email)·`#password`(type=password)·`.primary-button`(텍스트 "로그인", 계산 배경 `rgb(49, 130, 246)`)·`.auth-card`를 확인했다(1번·4번).
+- 2026-07-21 verify: 같은 세션에서 공백 제출 → `#email-error`="이메일을 입력해 주세요.", `#password-error`="비밀번호를 입력해 주세요." 동시 표시를 확인했다. `bad-email`/`toss1234!` 제출 → 이메일 필드에만 "올바른 이메일 형식이 아닙니다." 표시, `#password-error`는 공백 문자 하나(trim 시 길이 0)로 실질적으로 비어 있음을 `textContent`/`trim().length` 조회로 확인했다(6번).
+- 2026-07-21 verify: 오자격(`user@toss.local`/`wrong-password`) 제출 → URL `/login` 유지 + `[role="alert"]`에 "이메일 또는 비밀번호가 올바르지 않습니다." 표시를 확인했다. 시드 계정(`user@toss.local`/`toss1234!`) 제출 → URL이 `/`로 바뀌고 본문에 "토스사용자님, 반가워요"와 `user@toss.local`이 표시됨을 확인했다(5번·7번).
+- 2026-07-21 verify: 로그인 성공 직후 `browser_back` 시 URL이 `/login`이 아닌 `about:blank`(진입 이전 상태)로 이동해 `router.replace`가 히스토리에 로그인 페이지를 남기지 않음을 확인했다(5번).
+- 2026-07-21 verify: 홈에서 "로그아웃" 버튼을 실제 클릭 → URL이 `/login`으로 복귀함을 확인했고, 같은 세션에서 `/`로 재접근 시 다시 `/login`으로 차단됨을 확인해 세션 무효화가 홈 재접근 차단에도 반영됨을 확인했다(7번·8번).
+- 2026-07-21 verify: 1280px 창에서 `scrollWidth===innerWidth===1280`, 별도 격리된 새 360×800 창(쿠키 없음)에서 `scrollWidth===innerWidth===360`을 확인했다. 같은 360px 무쿠키 창에서 `/` 접근이 `/login`으로 리다이렉트됨을 재확인해 미로그인 홈 차단(8번)도 독립적으로 재검증했다(9번).
+- 2026-07-21 verify: `browser_errors`(action=view)가 전 여정에 걸쳐 0건이었다. `browser_console`(types=error)에는 경계 400·401 제출이 남긴 "Failed to load resource" 메시지만 있었고(과제 지시대로 실패로 보지 않음), "X-Toss-Event-Id" 관련 메시지는 탭 목록(`browser_tab list`) 확인 결과 별도로 열려 있던 실제 `https://toss.im` 탭(이전 DESIGN 단계 잔여물)에서 발생한 것으로 `fe/` 앱과 무관함을 확인했다. `nextjs-portal`의 shadow DOM을 조회해 실제 렌더된 오류 다이얼로그(`[role="dialog"]`)는 0개, 개발자 도구 배지 텍스트도 빈 문자열이라 Next.js 오류 오버레이가 활성화되지 않았음을 확인했다(11번).
+- 2026-07-21 verify: `node -e`로 `next.config.js`의 `rewrites()`를 직접 호출해 기본 모드 `[]`, `NEXT_PUBLIC_API_MODE=real` 모드 `[{"source":"/api/:path*","destination":"http://localhost:8080/api/:path*"}]`를 확인했다. `grep`으로 `fe/app`·`fe/lib`의 `fetch(` 호출 3건(`/api/me`,`/api/logout`,`/api/login`)이 모두 상대 경로임을 확인했다(10번).
+- 2026-07-21 verify: `fe/` 소스(`app`,`lib`,`next.config.js`,`scripts`) 전체에서 `http(s)://`·`@import`·`url(...)` 검색 결과가 `next.config.js`의 rewrite 대상 `:8080`과 `scripts/verify-stub.mjs`·`scripts/test-verify-stub.mjs`의 localhost 검증 주소 3건뿐이라 외부 CDN·폰트·원격 이미지가 없음을 확인했다(9번).
+- 2026-07-21 verify: DESIGN.md 2절을 재확인해 `#3182f6`(프라이머리)·`#191f28`(본문)·`#4e5968`(보조)·카드 최대 너비 420px·모서리 24px·데스크톱 여백 32px 기록을 확인했고, 실제 `.primary-button` 계산 배경 `rgb(49, 130, 246)`(= `#3182f6`)이 이 기록과 일치함을 확인했다(1번).
+- 2026-07-21 verify: `git diff --name-only`와 `git status --short`에 `be/` 경로가 없었다(이 프론트 워크트리에는 `be/` 디렉터리 자체가 존재하지 않는다)(12번).
+- 2026-07-21 verify: 검증에 사용한 `npm run dev:fresh` 프로세스를 SIGTERM으로 완전히 종료(잔여 `next dev` 프로세스 없음 확인)한 뒤, `dev:fresh`가 생성한 `fe/next-env.d.ts`(`.next-dev` 참조로 변경됨) 변경을 `git checkout`으로 원복하고 `fe/.next-dev` 디렉터리를 삭제해 `git status --short`가 다시 빈 출력임을 확인했다.
+- cycle green: 재생성된 TRD 13개 인수 조건을 `npm ci`·`npm audit --omit=dev`·`npm run build`(모두 종료 0), 새로 기동한 `npm run dev:fresh` 스텁 서버 대상 `npm run verify:stub`(종료 0, 재전송 401·정확한 키·UTC `Z`·쿠키 속성 포함), agent-browser 고유 격리 세션의 실제 클릭·입력 기반 전체 사용자 여정(미로그인 차단·400 필드 오류 2종·401 인라인·성공 리다이렉트와 히스토리 검사·홈 표시·로그아웃·재접근 차단·360~1280px 무스크롤·`browser_errors` 0건·오류 오버레이 부재), rewrite 조건부 분기, 소스 내 외부 자산 부재, `be/` 미수정까지 모두 독립적으로 재확인해 통과했다.
+
 - 2026-07-21 사이클 13 검증: `cd fe && npm run build`가 종료 코드 0으로 Next.js 컴파일과 TypeScript 검사를 통과했다.
 - 2026-07-21 사이클 13 검증: `cd fe && npm run verify:stub`가 계약 스텁 로그인·인증 확인·로그아웃 흐름을 통과했다.
 - cycle green: 사이클 13의 빌드와 스텁 검증이 모두 통과했다.
