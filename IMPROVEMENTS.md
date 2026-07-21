@@ -97,6 +97,7 @@ _Open items use "- [ ]". Empty Open list + green verify is the signal to create 
 - 2026-07-21 사이클 1 verify: `git diff --name-only`와 `git status --porcelain`이 모두 빈 출력(작업 트리 clean, `be/` 폴더는 이 워크트리에 존재하지 않음)임을 확인했다.
 - 2026-07-21 사이클 1 verify: DESIGN.md 2절을 재확인해 `#3182f6`(프라이머리)·`#191f28`(본문)·`#4e5968`(보조)·카드 최대 너비 420px·모서리 24px·데스크톱 여백 32px 기록과, 구현의 `.primary-button` 계산 배경 `rgb(49, 130, 246)`(= `#3182f6`)이 정확히 일치함을 확인했다.
 - cycle green: 정밀화된 TRD 12개 인수 조건을 `npm ci`·`npm audit`·`npm run build`(모두 종료 코드 0), 기존 :3000 스텁 서버 대상 `VERIFY_BASE_URL` 지정 `npm run verify:stub`(종료 코드 0, 재전송 401 포함), agent-browser 실제 클릭·입력 기반 전체 사용자 여정(미로그인 차단·폼 렌더·401/400 인라인 오류·성공 리다이렉트·로그아웃·360~1280px 무스크롤), 소스 검색(상대 경로 fetch·외부 자산 없음), `next.config.js` rewrite 분기, `git diff` 무변경까지 모두 독립적으로 재확인해 통과했다. `be/`는 건드리지 않았다.
+- 2026-07-21 사이클 1 evaluate: TRD.md의 인수 조건 13개가 모두 `- [x]`이고 마지막 VERIFY가 cycle green임을 확인했다. VERIFY의 각 체크 근거(위 88~99행)를 재검토한 결과 실행 명령·기대/실제 결과가 구체적으로 남아 있어 근거 부실로 되돌릴 항목은 없었다. `## Open`이 비어 있고 신규 위험·미검증 항목도 발견되지 않았으므로 루프를 종료하고 루트에 빈 `DONE` 파일을 생성한다.
 
 ## Verify failures
 
