@@ -8,7 +8,6 @@ _Open items use "- [ ]". Empty Open list + green verify is the signal to create 
 ## Verify
 
 - DESIGN.md 2절에서 agent-browser로 관찰한 toss.im의 색·타이포·버튼·여백 재현 근거를 확인했다.
-- 3001 스텁 서버의 `/api/login`·`/api/me`·`/api/logout`을 순서대로 호출해 400·401·200·204, 시드 계정, 쿠키, 오류 JSON 키와 UTC 타임스탬프를 확인했다.
 - agent-browser로 `/login`에서 이메일·비밀번호 입력, 로그인 버튼, 미니멀 카드와 파란 프라이머리 버튼 렌더링을 확인했다.
 - agent-browser로 401 자격 오류의 인라인 경고와 시드 계정 로그인 뒤 `/` 이동 및 `토스사용자` 표시를 확인했다.
 - agent-browser로 공백 제출과 잘못된 이메일 제출에서 `errors[]` 기반 이메일·비밀번호 인라인 메시지를 확인했다.
@@ -18,8 +17,10 @@ _Open items use "- [ ]". Empty Open list + green verify is the signal to create 
 - `NEXT_PUBLIC_API_MODE=real`과 기본 모드에서 `next.config.js`의 rewrite 결과 및 모든 UI API 호출의 상대 경로를 확인했다.
 - `git diff --name-only`에서 `be/` 경로가 없음을 확인했다.
 - `cd fe && npm ci && npm run build`가 종료 코드 0으로 완료되어 TypeScript strict 빌드를 확인했다.
+- 새로 시작한 :3000 스텁 서버에서 agent-browser로 미로그인 홈 접근, 시드 계정 로그인, 홈 리다이렉트, `토스사용자` 표시, 로그아웃 뒤 `/login` 복귀를 실제 클릭으로 확인했다.
+- 새 :3000 서버가 정상 기동되어, 이전 :3000 점유로 인한 검증 환경 오염은 이번 검증에서는 재현되지 않았다.
 
 ## Verify failures
 
 - [x] fix: `npm run dev:fresh`가 :3000 점유를 먼저 감지해 기존 개발 서버를 건드리지 않고 실패하도록 하고, `npm run verify:stub`으로 새 서버의 계약 흐름을 반복 검증할 수 있게 했다.
-- [ ] 환경 제약: 기존 :3000 프로세스가 점유한 상태라 해당 포트에서의 새 서버 브라우저 여정은 재실행하지 못했다. 프로세스 종료는 이 작업 범위 밖이므로, 새 서버를 시작할 수 있는 환경에서 `npm run dev:fresh` 뒤 agent-browser로 확인해야 한다.
+- [ ] fix: 로그아웃 뒤에도 만료 전 `toss_session=authenticated` 쿠키를 수동 재전송하면 `GET /api/me`가 200을 반환한다. 서버 측 세션 무효화 또는 재전송된 만료 세션 거부가 필요하다. (`fe/lib/stub-auth.ts`, :3000 새 서버의 curl 검증)
