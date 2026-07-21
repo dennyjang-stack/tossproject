@@ -82,6 +82,9 @@ _Open items use "- [ ]". Empty Open list + green verify is the signal to create 
 - 2026-07-21 사이클 12 검증 점검: `cd fe && npm run verify:stub`가 계약 스텁 로그인·인증 확인·로그아웃 흐름을 통과했다.
 - cycle green: 사이클 12의 빌드와 스텁 검증이 모두 통과했다.
 - 2026-07-21 사이클 12 평가 점검: TRD 인수 조건과 열린 개선 항목을 다시 확인한 결과, 추가 수정 없이 현재 상태를 종료 직전의 기준점으로 유지한다.
+- 2026-07-21 사이클 1(재생성 TRD 기준) 구현 점검: 정밀화된 인수 조건 12개를 하나씩 코드와 대조했다. 특히 새로 승격된 "로그아웃 세션 무효화" 조건은 `fe/lib/stub-auth.ts`의 `activeSessionIds`(인메모리 Set) 기반 세션 레지스트리로 이미 구현돼 있어(로그인 시 `crypto.randomUUID()` 발급·등록, `GET /api/me`는 Set에 남아 있을 때만 200, `POST /api/logout`은 Set에서 제거) 코드 변경이 필요 없었다. 나머지 조건(계약 스텁 3개, 로그인/홈 폼, `next.config.js` rewrite 조건부, 반응형 CSS, 외부 자산 부재)도 기존 구현이 재생성된 문구와 정확히 일치함을 확인했다. `git status`가 깨끗해 코드 변경 없이 이번 사이클을 마친다.
+- 2026-07-21 사이클 1 구현 검증: `npm ci`(취약점 0건), `npm run build`(TypeScript strict 통과)가 각각 종료 코드 0이었다. 기존에 실행 중이던 다른 워크트리의 :3000 스텁 서버(정상 스텁 응답 확인 후 그대로 사용, 종료하지 않음)를 대상으로 `VERIFY_BASE_URL=http://127.0.0.1:3000 npm run verify:stub`이 400/401/200/204와 로그아웃 뒤 재전송 쿠키 401을 모두 통과했다.
+- 2026-07-21 사이클 1 구현 검증: agent-browser로 쿠키 없는 `/` 접근 → `/login` 리다이렉트, 시드 계정 로그인 → `/` 이동과 `토스사용자님, 반가워요`+이메일 표시, `.primary-button` 계산 배경색 `rgb(49, 130, 246)`(TRD 요구값과 일치), 로그아웃 → `/login` 복귀, 잘못된 자격의 인라인 경고 "이메일 또는 비밀번호가 올바르지 않습니다.", 공백 제출의 `#email-error`·`#password-error` 동시 표시, `bad-email` 형식 오류의 이메일 전용 메시지, 360px·1280px 두 뷰포트 모두 `scrollWidth === innerWidth`를 실제 클릭·평가로 확인했다.
 
 ## Verify failures
 
