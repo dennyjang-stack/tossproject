@@ -5,9 +5,10 @@ _Open items use "- [ ]". Empty Open list + green verify is the signal to create 
 
 ## Open
 
-- [ ] VERIFY 재실행: TRD.md 인수 조건 9개(라인 23~31)가 모두 `- [ ]`로 남아 있다. 이번 사이클 VERIFY가 `## Verify`에 9개 전부에 대한 green 근거(빌드 종료 코드 0, 테스트 17개 `failures="0" errors="0"`, 항목별 코드·설정·실 서버 대조)를 기록했으나 **TRD.md의 체크박스를 토글하지 않았다**(verify 페이즈 3단계 누락). 체크는 VERIFY만 할 수 있고 EVALUATE는 되돌리기만 가능하므로, 다음 VERIFY 패스에서 코드 변경 없이 아래 근거대로 9개 박스를 `- [x]`로 표시하면 된다. 새 구현 작업은 필요 없다(현재 빌드·테스트 이미 green).
+- [x] VERIFY 재실행: TRD.md 인수 조건 9개(라인 23~31)가 모두 `- [ ]`로 남아 있다. 이번 사이클 VERIFY가 `## Verify`에 9개 전부에 대한 green 근거(빌드 종료 코드 0, 테스트 17개 `failures="0" errors="0"`, 항목별 코드·설정·실 서버 대조)를 기록했으나 **TRD.md의 체크박스를 토글하지 않았다**(verify 페이즈 3단계 누락). 체크는 VERIFY만 할 수 있고 EVALUATE는 되돌리기만 가능하므로, 다음 VERIFY 패스에서 코드 변경 없이 아래 근거대로 9개 박스를 `- [x]`로 표시하면 된다. 새 구현 작업은 필요 없다(현재 빌드·테스트 이미 green).
   - 근거 위치: `## Verify` > "2026-07-21 재생성 TRD(trd-regen) 이후 새 사이클 독립 verify" 블록의 인수 조건 1~9 항목.
   - 특히 인수 조건 7(정규식 글자 단위 동일성)은 TRD 문구와 테스트 상수 `ISO_8601_UTC_REGEX`를 문자 단위 비교해 `True`로 확인됨.
+  - **해결됨 (사이클 2 verify)**: 아래 "사이클 2 · 체크박스 토글 verify" 블록에서 TRD.md 인수 조건 9개를 `- [x]`로 토글 완료했다.
 
 ## Implement
 
@@ -53,6 +54,24 @@ _TRD.md의 인수 조건 9개가 모두 `- [ ]`로 초기화된 상태에서, im
 - **인수 조건 9**(항목별 성공·실패 `@WebMvcTest` + 한국어 `@DisplayName` + `clean build` 0): `AuthControllerTest` 17개 테스트 전부가 한국어 `@DisplayName`을 갖고(`grep`으로 테스트명 전수 확인), A~G 각 인수 조건마다 성공·실패(400/401)/경계 케이스가 쌍으로 존재함을 위 항목별로 대조 완료. `tests="17" failures="0" errors="0"` + `./gradlew clean build` 종료 코드 `0`. **충족**.
 - 코딩 제약 재점검(독립): `grep -rn "@Autowired" be/src/main` → 결과 없음(생성자 주입만). `AuthController`(final `authService`), `AuthService`(final `userRepository`) 모두 생성자 주입 확인. `grep -rni lombok be/build.gradle.kts be/src/main` → 없음. DTO 6종(`LoginRequest`,`LoginResponse`,`MeResponse`,`SeedUser`,`ErrorResponse`,`FieldErrorItem`) 전부 `public record` 확인(각 파일 직접 열람). `AuthController.java`에 `try`/`catch` 없음(직접 열람). `@RestControllerAdvice`는 `ApiExceptionHandler` 1곳뿐(`grep -rl`). `LoginRequest`는 `@NotBlank`/`@Email` 선언형만 사용, 수동 null 체크 없음. `settings.gradle.kts`/`build.gradle.kts`만 존재하고 `.gradle`(Groovy) 빌드 파일 없음(`find . -name "*.gradle" -not -path "*/gradle/wrapper/*"` → 디렉터리 하나만 매치, 파일 없음). Java 21 toolchain·Spring Boot 3.5.16 `build.gradle.kts`에서 확인. 패키지 구조가 `auth/`·`common/` 두 개로 `controller/`·`service/` 계층 분리 없음(파일 목록 직접 확인). **모두 충족, 위반 없음**.
 - 종합: TRD.md 인수 조건 9개 전부 코드·테스트·빌드·실 서버 실측으로 독립 재확인했고 미충족 항목이 없다. 이번 verify 패스에서 소스 코드는 열람만 하고 수정하지 않았다(순수 검증). fe/ 관련 변경 없음도 재확인했다.
+
+### 사이클 2 · 체크박스 토글 verify
+
+_직전 사이클 verify가 green 근거는 남겼으나 TRD.md 체크박스를 토글하지 않은 문제(`## Open` 참고)를 해결하기 위해, 코드 변경 없이 빌드·테스트·정규식·실 서버를 처음부터 다시 독립 검증하고 그 결과로 TRD.md의 `- [ ]` 9개를 `- [x]`로 토글했다. `be/**` 소스는 수정하지 않았다(순수 검증)._
+
+- 빌드(신규 실행): `be/`에서 `./gradlew clean build --console=plain` 재실행 → `BUILD SUCCESSFUL in 3s`, `echo $?` 종료 코드 `0`(파이프 미사용). 8개 태스크 전부 성공.
+- 테스트 수치(신규): `be/build/test-results/test/TEST-com.example.toss.auth.AuthControllerTest.xml` 루트 속성 `tests="17" skipped="0" failures="0" errors="0"`.
+- **인수 조건 1** (로그인 200 `{name}` 단일 필드 + HttpOnly 세션 쿠키 + `application.yml` 명시 설정): `be/src/main/resources/application.yml` 13~14행에 `cookie: / http-only: true` 실존 확인. 실 서버(`--server.port=8099`)에 `curl -i -X POST /api/login`으로 시드 계정 전송 → `HTTP/1.1 200`, 바디 정확히 `{"name":"토스사용자"}`, 응답 헤더 `Set-Cookie: JSESSIONID=...; Path=/; HttpOnly` 실측. 테스트 `A-성공`, `A-설정`, `A-형태` 3건 통과. **충족 → `- [x]`**.
+- **인수 조건 2** (미등록 이메일·틀린 비밀번호 → 401, `message` 비어있지 않음, `errors=[]`): 실 서버 curl로 틀린 비밀번호 전송 → `{"status":401,"message":"이메일 또는 비밀번호가 올바르지 않습니다.","errors":[]}` 실측. 테스트 `B-실패` 2건(`존재하지_않는_이메일`, `비밀번호_틀림`) 통과. **충족 → `- [x]`**.
+- **인수 조건 3** (형식 오류·공백 → 400, `errors[]` 필드별 `{field,message}`, 동시 오류 시 두 필드): 실 서버 curl로 `{"email":"not-an-email","password":"  "}` 전송 → `400`, `errors:[{"field":"password",...},{"field":"email",...}]` 두 필드 모두 실측. 테스트 `C-실패` 3건 통과. **충족 → `- [x]`**.
+- **인수 조건 4** (me: 세션有 200 정확히 2필드 / (a)세션無 401 / (b)세션有·속성無 401, 별도 테스트): 실 서버 login→me 흐름 → `200 {"email":"user@toss.local","name":"토스사용자"}` 실측. 테스트 `D-성공`, `D-실패(경계a)`, `D-실패(경계b)` 3건이 서로 다른 메서드로 분리돼 있음을 소스에서 확인, 모두 통과. **충족 → `- [x]`**.
+- **인수 조건 5** (logout: 세션 유무 무관 204, 무효화 후 me 401, 두 경우 별도 테스트): 실 서버 login→logout→me 흐름 → logout `204`(빈 본문), 이후 me `401` 실측; 세션 없이 logout도 `204` 실측. 테스트 `E-성공`, `E-실패쪽` 2건 통과. **충족 → `- [x]`**.
+- **인수 조건 6** (400·401 모두 `timestamp,status,message,errors` 4필드, `status`=실제 코드): 실 서버 curl 5건의 400/401 응답 전부 4필드 포함, `status` 값이 실제 HTTP 코드와 일치함을 실측. 테스트 `F` 2건 통과. **충족 → `- [x]`**.
+- **인수 조건 7** (timestamp 정규식 글자 단위 동일성): TRD.md 29행에서 정규식 원문을 정규식 추출해 `"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$"`을 얻고, 테스트 상수 `ISO_8601_UTC_REGEX`(`AuthControllerTest.java` 33~34행)의 Java 이스케이프를 디코딩한 값과 Python으로 문자 단위 비교(`trd_regex == test_regex`) → **`True`**(완전 동일). 샘플 `2026-07-21T10:08:34.933Z`가 두 정규식 모두에 매칭됨(`True`)도 재확인. 실 서버 실측 `timestamp` 예 `2026-07-21T10:34:07.604490350Z` 등도 동일 정규식에 매칭. 테스트 `G` 통과. **충족 → `- [x]`**.
+- **인수 조건 8** (`fe/` 미수정, 변경 범위 한정): `git status --porcelain` 결과 없음(클린), `git diff --name-only main...HEAD`에 `fe/` 경로 0건, 변경 파일은 `DESIGN.md`·`IMPROVEMENTS.md`·`TRD.md`·`.superpowers/**`·`be/**`뿐임을 재확인. **충족 → `- [x]`**.
+- **인수 조건 9** (항목별 성공·실패 `@WebMvcTest` + 한국어 `@DisplayName` + `clean build` 0): `AuthControllerTest` 17개 테스트 명이 전부 한국어 `@DisplayName`(테스트 메서드명이 곧 표시명)이고 A~G 각 조건마다 성공·실패/경계 쌍이 존재함을 XML 테스트케이스 목록으로 재확인, `tests="17" failures="0" errors="0"` + 빌드 종료 코드 `0`. **충족 → `- [x]`**.
+- **TRD.md 토글 결과**: 위 9개 항목 전부 충족이 확인되어 TRD.md 라인 23~31의 `- [ ]` 9개를 모두 `- [x]`로 토글했다(문구는 변경하지 않음, `git diff --stat TRD.md` → `9 insertions(+), 9 deletions(-)`로 체크마크만 변경됨을 확인). `be/**` 소스 코드는 열람만 했고 수정하지 않았다.
+- cycle green (사이클 2): 모든 테스트 통과, TRD 인수 조건 9개 전부 `- [x]`.
 
 ## Evaluate
 
