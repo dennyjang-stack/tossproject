@@ -7,6 +7,7 @@ _Open items use "- [ ]". Empty Open list + green verify is the signal to create 
 
 ## Verify
 
+- 2026-07-21 fresh verify: `be/`에서 `./gradlew clean build` 재실행 → `BUILD SUCCESSFUL`, 종료 코드 `0`, `AuthControllerTest` `tests="14" failures="0" errors="0"` 확인. `git diff --name-only main...HEAD`에도 `fe/` 경로 없음.
 - cycle green: 모든 테스트 통과
 - 빌드: `be/`에서 `./gradlew clean build` 실행 → **BUILD SUCCESSFUL**, 종료 코드 **0** 확인 (파이프 없이 `$?` 직접 캡처로 재확인).
 - 테스트: `be/build/test-results/test/TEST-com.example.toss.auth.AuthControllerTest.xml` → `tests="14" skipped="0" failures="0" errors="0"`. 인수 조건 A~G마다 성공·실패(400/401) 케이스가 쌍으로 존재하고, HttpOnly 명시 설정 테스트가 추가되었다.
