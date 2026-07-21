@@ -62,6 +62,16 @@ class AuthControllerTest {
 	}
 
 	@Test
+	@DisplayName("A-형태: 로그인 성공 응답은 다른 키 없이 name 하나만 갖는다")
+	void 로그인_성공_응답필드_하나뿐() throws Exception {
+		mockMvc.perform(post("/api/login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(new LoginRequest(SEED_EMAIL, SEED_PASSWORD))))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$").value(org.hamcrest.Matchers.aMapWithSize(1)));
+	}
+
+	@Test
 	@DisplayName("A-설정: 세션 쿠키의 HttpOnly 설정이 명시적으로 true다")
 	void 세션쿠키_HttpOnly_명시설정() {
 		assertThat(environment.getProperty("server.servlet.session.cookie.http-only"))
@@ -92,7 +102,11 @@ class AuthControllerTest {
 						.content(objectMapper.writeValueAsString(
 								new LoginRequest("nobody@toss.local", SEED_PASSWORD))))
 				.andExpect(status().isUnauthorized())
-				.andExpect(jsonPath("$.status").value(401));
+				.andExpect(jsonPath("$.status").value(401))
+				.andExpect(jsonPath("$.message").value("이메일 또는 비밀번호가 올바르지 않습니다."))
+				.andExpect(jsonPath("$.errors").isArray())
+				.andExpect(jsonPath("$.errors").isEmpty())
+				.andExpect(jsonPath("$.timestamp").value(org.hamcrest.Matchers.matchesPattern(ISO_8601_UTC_REGEX)));
 	}
 
 	// ---------- C. 형식 오류 ----------
@@ -122,6 +136,21 @@ class AuthControllerTest {
 	}
 
 	@Test
+	@DisplayName("C-실패: 이메일과 비밀번호가 동시에 잘못되면 errors에 두 필드 항목이 모두 담긴다")
+	void 로그인_이메일_비밀번호_동시_형식오류() throws Exception {
+		mockMvc.perform(post("/api/login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(new LoginRequest("not-an-email", "  "))))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.errors[*].field",
+						org.hamcrest.Matchers.containsInAnyOrder("email", "password")))
+				.andExpect(jsonPath("$.errors[*].message",
+						org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.not(
+								org.hamcrest.Matchers.emptyOrNullString()))));
+	}
+
+	@Test
 	@DisplayName("C-성공: 형식이 올바르면 400 대신 정상 로그인 흐름을 탄다")
 	void 로그인_형식_올바름_성공쌍() throws Exception {
 		mockMvc.perform(post("/api/login")
@@ -140,13 +169,26 @@ class AuthControllerTest {
 		mockMvc.perform(get("/api/me").session(session))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.email").value(SEED_EMAIL))
-				.andExpect(jsonPath("$.name").value(SEED_NAME));
+				.andExpect(jsonPath("$.name").value(SEED_NAME))
+				.andExpect(jsonPath("$").value(org.hamcrest.Matchers.aMapWithSize(2)));
 	}
 
 	@Test
-	@DisplayName("D-실패: 로그인 세션이 없으면 me는 401을 반환한다")
+	@DisplayName("D-실패(경계a): 세션 쿠키 자체가 없으면 me는 401을 반환한다")
 	void me_세션없음() throws Exception {
 		mockMvc.perform(get("/api/me"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.status").value(401))
+				.andExpect(jsonPath("$.message").value("로그인이 필요합니다."))
+				.andExpect(jsonPath("$.errors").isEmpty());
+	}
+
+	@Test
+	@DisplayName("D-실패(경계b): 세션은 있으나 로그인 사용자 속성이 없으면 me는 401을 반환한다")
+	void me_세션있으나_로그인속성없음() throws Exception {
+		MockHttpSession sessionWithoutLoginAttribute = new MockHttpSession();
+
+		mockMvc.perform(get("/api/me").session(sessionWithoutLoginAttribute))
 				.andExpect(status().isUnauthorized())
 				.andExpect(jsonPath("$.status").value(401))
 				.andExpect(jsonPath("$.message").value("로그인이 필요합니다."))
