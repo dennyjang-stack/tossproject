@@ -1,12 +1,17 @@
 import type { ErrorResponse, FieldError } from './api-types';
 
 export const SESSION_COOKIE_NAME = 'toss_session';
-export const SESSION_COOKIE_VALUE = 'authenticated';
 export const SEED_EMAIL = 'user@toss.local';
 export const SEED_PASSWORD = 'toss1234!';
 export const SEED_NAME = '토스사용자';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+type StubSessionRegistry = typeof globalThis & {
+  tossStubActiveSessionIds?: Set<string>;
+};
+
+const sessionRegistry = globalThis as StubSessionRegistry;
+const activeSessionIds = sessionRegistry.tossStubActiveSessionIds ??= new Set<string>();
 
 type LoginPayload = {
   email?: unknown;
@@ -17,15 +22,29 @@ function timestamp() {
   return new Date().toISOString();
 }
 
-export function isSeedSession(cookieHeader: string | null): boolean {
+function getSessionId(cookieHeader: string | null): string | null {
   if (!cookieHeader) {
-    return false;
+    return null;
   }
 
   return cookieHeader
     .split(';')
     .map((entry) => entry.trim())
-    .some((entry) => entry === `${SESSION_COOKIE_NAME}=${SESSION_COOKIE_VALUE}`);
+    .find((entry) => entry.startsWith(`${SESSION_COOKIE_NAME}=`))
+    ?.slice(`${SESSION_COOKIE_NAME}=`.length) ?? null;
+}
+
+export function isSeedSession(cookieHeader: string | null): boolean {
+  const sessionId = getSessionId(cookieHeader);
+  return sessionId !== null && activeSessionIds.has(sessionId);
+}
+
+export function invalidateSession(cookieHeader: string | null) {
+  const sessionId = getSessionId(cookieHeader);
+
+  if (sessionId) {
+    activeSessionIds.delete(sessionId);
+  }
 }
 
 export function createErrorResponse(
@@ -43,9 +62,9 @@ export function createErrorResponse(
   return Response.json(body, { status });
 }
 
-function buildCookieAttributes(maxAge?: number) {
+function buildCookieAttributes(value: string, maxAge?: number) {
   const parts = [
-    `${SESSION_COOKIE_NAME}=${SESSION_COOKIE_VALUE}`,
+    `${SESSION_COOKIE_NAME}=${value}`,
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
@@ -63,11 +82,13 @@ function buildCookieAttributes(maxAge?: number) {
 }
 
 export function createLoginCookie() {
-  return buildCookieAttributes();
+  const sessionId = crypto.randomUUID();
+  activeSessionIds.add(sessionId);
+  return buildCookieAttributes(sessionId);
 }
 
 export function createLogoutCookie() {
-  return buildCookieAttributes(0);
+  return buildCookieAttributes('', 0);
 }
 
 export async function parseLoginPayload(request: Request): Promise<LoginPayload | 'invalid-json'> {

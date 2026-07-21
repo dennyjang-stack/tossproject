@@ -53,7 +53,7 @@ const login = await fetch(`${baseUrl}/api/login`, {
 assert(login.status === 200, '시드 계정 로그인은 200이어야 합니다.');
 assert((await readJson(login)).name === '토스사용자', '로그인 응답 이름이 일치해야 합니다.');
 const setCookie = login.headers.get('set-cookie');
-assert(setCookie?.includes('toss_session=authenticated'), '로그인 응답에 세션 쿠키가 있어야 합니다.');
+assert(setCookie?.startsWith('toss_session='), '로그인 응답에 세션 쿠키가 있어야 합니다.');
 assert(setCookie?.includes('HttpOnly'), '세션 쿠키가 HttpOnly여야 합니다.');
 const cookie = setCookie.split(';', 1)[0];
 
@@ -65,6 +65,10 @@ assert(meBody.email === 'user@toss.local' && meBody.name === '토스사용자', 
 const logout = await fetch(`${baseUrl}/api/logout`, { method: 'POST', headers: { cookie } });
 assert(logout.status === 204, '로그아웃은 204여야 합니다.');
 assert(logout.headers.get('set-cookie')?.includes('Max-Age=0'), '로그아웃이 세션 쿠키를 만료시켜야 합니다.');
+
+const replayed = await fetch(`${baseUrl}/api/me`, { headers: { cookie } });
+assert(replayed.status === 401, '로그아웃 뒤 같은 세션 쿠키를 재전송한 /api/me은 401이어야 합니다.');
+assertErrorPayload(await readJson(replayed), 401);
 
 const unauthenticated = await fetch(`${baseUrl}/api/me`);
 assert(unauthenticated.status === 401, '쿠키 없는 /api/me은 401이어야 합니다.');

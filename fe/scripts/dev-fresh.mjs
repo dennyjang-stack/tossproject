@@ -29,7 +29,11 @@ try {
 const next = process.platform === 'win32' ? 'next.cmd' : 'next';
 const server = spawn(next, ['dev', '-p', String(PORT)], {
   stdio: 'inherit',
-  env: { ...process.env, NEXT_PUBLIC_API_MODE: 'stub' },
+  env: {
+    ...process.env,
+    NEXT_DEV_DIST_DIR: '.next-dev',
+    NEXT_PUBLIC_API_MODE: 'stub',
+  },
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
