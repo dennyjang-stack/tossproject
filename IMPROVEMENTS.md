@@ -87,3 +87,21 @@ _Open items use "- [ ]". Empty Open list + green verify is the signal to create 
 
 - [x] fix: `npm run dev:fresh`가 :3000 점유를 먼저 감지해 기존 개발 서버를 건드리지 않고 실패하도록 하고, `npm run verify:stub`으로 새 서버의 계약 흐름을 반복 검증할 수 있게 했다.
 - [x] fix: 로그아웃 뒤에도 만료 전 `toss_session=authenticated` 쿠키를 수동 재전송하면 `GET /api/me`가 200을 반환한다. 서버 측 세션 무효화 또는 재전송된 만료 세션 거부가 필요하다. (`fe/lib/stub-auth.ts`, :3000 새 서버의 curl 검증)
+
+## 교차검증 정합성
+
+_사이클 1 · crossverify-consistency 페이즈. 이전 세대(반대 프로바이더) 산출물이 TRD 인수 조건을 실제로 충족하는지 코드 변경 없이 독립 재검증했다. `npm ci`·`npm run build`(종료 코드 0), 기존 :3000 스텁 서버에서 `npm run verify:stub`(종료 코드 0), agent-browser 실동작, 소스 검토를 근거로 판단했다._
+
+- [x] pass: agent-browser로 toss.im 스타일 재현 포인트를 DESIGN.md에 기록 — DESIGN.md 2절에 1280×720·360×800 관찰과 `#3182f6`·`#191f28`·`#4e5968`·여백·버튼 촉감의 재현 원칙이 구체적으로 적혀 있고, `/login`의 실제 프라이머리 버튼 배경이 `rgb(49,130,246)`으로 그 값과 일치한다.
+- [x] pass: 계약 스텁 3개가 계약 표와 동일한 상태코드·필드명·에러 형태·시드 계정으로 동작 — `npm run verify:stub`가 공백 400(email·password `errors[]`), 잘못된 자격 401, 시드 200 `{name:"토스사용자"}`+HttpOnly 쿠키, 로그아웃 204+`Max-Age=0`, 재전송 쿠키 401, 무쿠키 401을 모두 통과했다. 오류 본문은 `{timestamp,status,message,errors[]}` 형태다.
+- [x] pass: `/login`이 이메일·비밀번호 입력과 로그인 버튼을 갖춘 토스 스타일 미니멀 카드·파란 버튼 폼을 렌더 — DOM 조회로 `#email`·`#password`·`.primary-button`(텍스트 "로그인", 배경 `rgb(49,130,246)`)과 `.auth-card`를 확인했다.
+- [x] pass: 성공 시 `router.replace('/')`, 401 시 인라인 에러 — 시드 계정 제출 후 URL이 `/`로 바뀌고 `토스사용자님, 반가워요`가 표시되며, 잘못된 자격 제출 시 `/login`을 유지한 채 `.form-alert`에 "이메일 또는 비밀번호가 올바르지 않습니다."가 표시됐다. `page.tsx`도 `router.replace`를 사용한다.
+- [x] pass: 잘못된 이메일·공백 제출 시 400 `errors[]`를 필드별 인라인 메시지로 표시 — 공백 제출은 `#email-error`·`#password-error` 둘 다 채워지고, `bad-email` 제출은 이메일 필드에만 "올바른 이메일 형식이 아닙니다."가 표시됐다.
+- [x] pass: 홈이 `토스사용자`를 표시하고 로그아웃 시 `/login`으로 복귀 — 로그인 후 이름·이메일이 렌더되고, 로그아웃 버튼 클릭 뒤 URL이 `/login`으로 바뀌며 로그인 폼이 다시 나타났다.
+- [x] pass: 미로그인 `/` 접근 시 `/login`으로 리다이렉트 — 쿠키 없는 새 창에서 `/` 진입 시 `GET /api/me` 401 판정으로 `/login`으로 대체됐다.
+- [x] pass: 360~1280px에서 레이아웃 미파손·외부 CDN/폰트/이미지 없음 — 360×800에서 `scrollWidth===innerWidth===360`(카드 320px), 1280에서도 `scrollWidth===innerWidth`였고, `fe` 소스 검색에서 외부 http(s)/@import/폰트/원격 이미지 참조가 없었다(유일한 `http://` 2건은 rewrite 대상 :8080과 검증 스크립트의 localhost).
+- [x] pass: `NEXT_PUBLIC_API_MODE=real`이면 rewrite 전환, 코드는 상대 경로만 호출 — `next.config.js`가 `real`일 때만 `/api/:path*`→`http://localhost:8080/api/:path*`를 반환하고 기본 모드는 `[]`를 반환하며, UI의 모든 `fetch`가 `/api/...` 상대 경로다.
+- [x] pass: agent-browser로 :3000 스텁 서버에서 로그인→홈 리다이렉트→로그아웃 실동작 확인 — 위 브라우저 여정으로 실제 이벤트를 디스패치해 전 구간을 재현했다.
+- [x] pass: `be/` 폴더 미수정 — 워크트리에 `be/`가 존재하지 않고(추적 파일 0건), `git diff --name-only`에 `be/` 경로가 없다.
+- [x] pass: `npm run build` 종료 코드 0(TypeScript strict) — `npm ci`(0 vulnerabilities)와 `npm run build`가 모두 종료 코드 0으로 Next.js 컴파일과 타입 검사를 통과했다.
+- [x] pass: 이전 verify 실패 2건(dev:fresh 포트 가드·로그아웃 세션 무효화) 해소 확인 — `npm run dev:fresh`가 점유된 :3000을 감지해 기존 서버를 건드리지 않고 안내와 함께 실패했고, `verify:stub`의 로그아웃 후 재전송 쿠키 401 검사가 통과해 서버 측 세션 무효화가 동작함을 확인했다.
