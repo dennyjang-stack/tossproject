@@ -41,3 +41,9 @@ _Open items use "- [ ]". Empty Open list + green verify is the signal to create 
 - [x] pass: 시간 값(`timestamp`)은 ISO-8601(UTC) 문자열로 직렬화된다 — `ErrorResponse.of`가 `Instant.now().toString()`을 사용하고 전용 테스트가 `...Z` 정규식을 검증하며, 실 서버 응답 `2026-07-21T09:42:29.736315698Z`도 확인했다.
 - [x] pass: `fe/` 폴더를 수정하지 않았다 (`git diff --name-only`에 `fe/` 없음) — `git diff --name-only main...HEAD` 결과가 문서와 `be/**`에만 한정되고 이 워크트리에 `fe/` 변경이 없다.
 - [x] pass: 위 각 항목마다 성공·실패 케이스 `@WebMvcTest` 테스트가 존재하고 `./gradlew clean build`가 종료 코드 0으로 끝난다 — `AuthControllerTest`의 한국어 `@DisplayName` 테스트 13개가 `tests="13" skipped="0" failures="0" errors="0"`로 통과했고, 새로 실행한 전체 빌드가 `BUILD SUCCESSFUL`·종료 코드 0으로 끝났다.
+
+## TRD 재생성
+
+- 교차검증의 9개 인수 조건이 모두 pass이고 fail·doubt가 없어 기능 범위와 조건 수는 유지했다.
+- 다음 세대가 MockMvc로 독립 재현할 수 있도록 시드 요청·정확한 응답 필드, HttpOnly 쿠키 명시 설정, 오류별 `errors[]`, UTC 정규식, Git 비교 범위와 빌드 기대 결과를 조건에 구체화했다.
+- 기존 인수 조건 9개의 체크박스를 모두 `- [ ]`로 초기화해 다음 세대가 처음부터 다시 검증하도록 했다.
